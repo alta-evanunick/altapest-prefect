@@ -1,0 +1,17 @@
+# prefect.yaml
+name: fieldroutes-etl
+prefect-version: 2.14.0
+
+build:
+- prefect.deployments.steps.git_clone_project:
+    repository: https://github.com/alta-evanunick/altapest-prefect.git
+    branch: main
+
+deployments:
+- name: seattle-employee-etl
+  entrypoint: fieldroutes_employee_flow.py:fieldroutes_employee_etl
+  description: Daily Seattle Employee ETL from GitHub
+  work_pool:
+    name: default-agent-pool
+  schedule:
+    cron: "0 6 * * *"  # Run daily at 6 AM
