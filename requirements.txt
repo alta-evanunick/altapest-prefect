@@ -1,11 +1,11 @@
 # Core orchestration & blocks
 
-prefect==2.18.6
-prefect-snowflake==0.3.0
+prefect==2.19.0
+prefect-snowflake==0.32.0
 
 # Snowflake connectivity
 
-snowflake-connector-python==3.7.2
+snowflake-connector-python==3.8.1
 snowflake-sqlalchemy==1.5.1
 
 # HTTP
