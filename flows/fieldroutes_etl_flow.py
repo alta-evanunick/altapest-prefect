@@ -120,8 +120,9 @@ def fetch_entity(
     logger.info(f"Office {office_id} – {entity}: {len(records)} records fetched")
 
     load_ts = window_end.strftime("%Y-%m-%d %H:%M:%S")
-    with SnowflakeConnector.load("snowflake-altapestdb") as sf:
-        cur = sf.cursor()
+    sf_block = SnowflakeConnector.load("snowflake-altapestdb")
+    with sf_block.get_connection() as sf_conn:     # or .connect() on older plugin
+        cur = sf_conn.cursor()
         # RAW layer (verbatim JSON)
         cur.executemany(
             f"INSERT INTO RAW.fieldroutes.{table_name}_RAW (officeid, loaddatetimeutc, rawdata) VALUES (%s,%s,PARSE_JSON(%s))",
@@ -159,16 +160,17 @@ def fetch_entity(
             """UPDATE Etl.office_entity_watermark SET last_run_utc = %s WHERE office_id = %s AND entity_name = %s""",
             (load_ts, office_id, entity),
         )
-        sf.commit()
+        sf_conn.commit()
 
 
 @flow(name="FieldRoutes_Nightly_ETL")
 def run_nightly_fieldroutes_etl():
     logger      = get_run_logger()
-    window_end  = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.UTC)
 
-    with SnowflakeConnector.load("snowflake-altapestdb") as sf:
-        cur = sf.cursor()
+    sf_block = SnowflakeConnector.load("snowflake-altapestdb")
+    with sf_block.get_connection() as sf_conn:     # or .connect() on older plugin
+        cur = sf_conn.cursor()
         cur.execute(
             """
             SELECT o.office_id, o.office_name, o.base_url, o.secret_block_name,
@@ -203,7 +205,7 @@ def run_nightly_fieldroutes_etl():
                 is_dim=is_dim,
                 small_volume=small_vol,
                 window_start=office["watermarks"].get(api_e),
-                window_end=window_end,
+                window_end=now,
             )
 
 

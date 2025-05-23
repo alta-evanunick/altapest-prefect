@@ -9,7 +9,8 @@ def run_nightly_fieldroutes_etl():
     logger = get_run_logger()
     # 1. Retrieve all offices and last run timestamps from Snowflake config table
     offices = []
-    with SnowflakeConnector.load("snowflake-altapestdb") as sf_conn:
+    sf_block = SnowflakeConnector.load("snowflake-altapestdb")
+    with sf_block.get_connection() as sf_conn:     # or .connect() on older plugin
         cur = sf_conn.cursor()
         cur.execute("SELECT OfficeID, OfficeName, LastSuccessfulRunUTC FROM Config.OfficeLastRun;")
         for row in cur.fetchall():
@@ -40,12 +41,13 @@ def run_cdc_fieldroutes_etl():
     """Prefect flow to perform a 2-hour interval CDC for high-velocity tables during business hours."""
     logger = get_run_logger()
     # Determine the CDC window: last 2 hours (with a small overlap of 15 min for safety)
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(datetime.UTC)
     window_start = now - datetime.timedelta(hours=2, minutes=15)
     window_end = now
     # Optionally, we could filter offices or entities here if needed
     offices = []
-    with SnowflakeConnector.load("snowflake-altapestdb") as sf_conn:
+    sf_block = SnowflakeConnector.load("snowflake-altapestdb")
+    with sf_block.get_connection() as sf_conn:     # or .connect() on older plugin
         cur = sf_conn.cursor()
         cur.execute("SELECT OfficeID, OfficeName FROM Config.OfficeLastRun;")
         for row in cur.fetchall():
