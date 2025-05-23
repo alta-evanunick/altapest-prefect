@@ -163,7 +163,7 @@ def fetch_entity(
 
 
 @flow(name="FieldRoutes_Nightly_ETL")
-def nightly_etl():
+def run_nightly_fieldroutes_etl():
     logger      = get_run_logger()
     window_end  = datetime.datetime.utcnow()
 
@@ -208,4 +208,4 @@ def nightly_etl():
 
 
 if __name__ == "__main__":
-    nightly_etl()
+    run_nightly_fieldroutes_etl()
