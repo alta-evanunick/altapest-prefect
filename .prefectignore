@@ -1,0 +1,26 @@
+Files and folders Prefect should NOT upload to storage
+
+Local venvs & caches
+
+.venv/
+pycache/
+*.py[cod]
+
+OS noise
+
+.DS_Store
+Thumbs.db
+
+Big local data sets / seeds
+
+/data/
+*.csv
+*.parquet
+
+Logs
+
+*.log
+
+debug/
+
+Git metadata is automatically ignored

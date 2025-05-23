@@ -1,0 +1,31 @@
+---- Python & editor junk --------------------------------
+
+pycache/
+*.py[cod]
+*.egg-info/
+
+---- Virtual environments --------------------------------
+
+.venv/
+.env/
+
+---- OS files --------------------------------------------
+
+.DS_Store
+Thumbs.db
+
+---- Logs / artifacts ------------------------------------
+
+*.log
+debug/
+
+---- Local data / secrets --------------------------------
+
+data/
+*.csv
+*.json
+*.yaml
+
+---- Prefect local state ---------------------------------
+
+.prefect/

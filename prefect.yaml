@@ -1,17 +1,40 @@
-# prefect.yaml
-name: fieldroutes-etl
-prefect-version: 2.14.0
-
-build:
-- prefect.deployments.steps.git_clone_project:
-    repository: https://github.com/alta-evanunick/altapest-prefect.git
-    branch: main
-
+# prefect.yaml - deployment configurations for FieldRoutes ETL flows
 deployments:
-- name: seattle-employee-etl
-  entrypoint: fieldroutes_employee_flow.py:fieldroutes_employee_etl
-  description: Daily Seattle Employee ETL from GitHub
-  work_pool:
-    name: default-agent-pool
-  schedule:
-    cron: "0 6 * * *"  # Run daily at 6 AM
+  - name: fieldroutes-nightly
+    flow_name: FieldRoutes_Nightly_Flow
+    entrypoint: flows/fieldroutes_etl_flow.py:run_nightly_fieldroutes_etl
+    schedule:
+      cron: "0 6 * * *"            # run daily at 6:00 AM Mountain Time
+      timezone: "America/Denver"
+    description: "Nightly full extract of all FieldRoutes entities for all offices."
+    tags: ["fieldroutes", "nightly"]
+    work_queue_name: "default"
+    parameters: {} 
+    pull:
+      - prefect.deployments.steps.git_clone:
+          id: clone-repo
+          repository: https://github.com/alta-evanunick/altapest-prefect.git
+          branch: main
+          credentials: "{{ prefect.blocks.github-credentials.github-evanunick }}"
+      - prefect.deployments.steps.pip_install_requirements:
+          directory: "{{ clone-repo.directory }}"
+          requirements_file: "requirements.txt"
+  - name: fieldroutes-cdc
+    flow_name: FieldRoutes_CDC_Flow
+    entrypoint: flows/fieldroutes_etl_flow.py:run_cdc_fieldroutes_etl
+    schedule:
+      cron: "0 8-17/2 * * 1-5"     # run every 2 hours between 8:00-17:00, Monday-Friday
+      timezone: "America/Denver"
+    description: "2-hour interval CDC for high-velocity FieldRoutes tables during business hours."
+    tags: ["fieldroutes", "cdc"]
+    work_queue_name: "default"
+    parameters: {}
+    pull:
+      - prefect.deployments.steps.git_clone:
+          id: clone-repo
+          repository: https://github.com/alta-evanunick/altapest-prefect.git
+          branch: main
+          credentials: "{{ prefect.blocks.github-credentials.github-evanunick }}"
+      - prefect.deployments.steps.pip_install_requirements:
+          directory: "{{ clone-repo.directory }}"
+          requirements_file: "requirements.txt"
