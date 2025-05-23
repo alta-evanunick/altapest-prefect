@@ -13,7 +13,7 @@ This script only loads RAW and runs a *minimal* staging insert (a placeholder) �
 Prereqs
 -------
 * **Static roster** – `Ref.offices_lookup` (office_id, office_name, base_url, secret_block_name)
-* **Dynamic watermark** – `Etl.office_entity_watermark` (office_id, entity_name, last_run_utc)
+* **Dynamic watermark** – `RAW.REF.office_entity_watermark` (office_id, entity_name, last_run_utc)
 * **Prefect blocks** – secret creds (`fieldroutes‑<OfficeName>‑auth‑key`), Snowflake connector `snowflake-altapestdb`
 """
 
@@ -157,7 +157,7 @@ def fetch_entity(
         )
         # Watermark update
         cur.execute(
-            """UPDATE Etl.office_entity_watermark SET last_run_utc = %s WHERE office_id = %s AND entity_name = %s""",
+            """UPDATE RAW.REF.office_entity_watermark SET last_run_utc = %s WHERE office_id = %s AND entity_name = %s""",
             (load_ts, office_id, entity),
         )
         sf_conn.commit()
@@ -176,7 +176,7 @@ def run_nightly_fieldroutes_etl():
             SELECT o.office_id, o.office_name, o.base_url, o.secret_block_name,
                    w.entity_name, w.last_run_utc
             FROM   Ref.offices_lookup  o
-            JOIN   Etl.office_entity_watermark w USING (office_id);
+            JOIN   RAW.REF.office_entity_watermark w USING (office_id);
             """
         )
         rows = cur.fetchall()

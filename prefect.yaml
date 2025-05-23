@@ -38,4 +38,4 @@ deployments:
           credentials: "{{ prefect.blocks.github-credentials.github-evanunick }}"
       - prefect.deployments.steps.run_shell_script:
           id: install_requirements
-          script: "pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity"
+          script: "pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow==18.1.0 tenacity"
