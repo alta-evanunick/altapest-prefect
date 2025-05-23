@@ -12,7 +12,7 @@ This script only loads RAW and runs a *minimal* staging insert (a placeholder) �
 
 Prereqs
 -------
-* **Static roster** – `Ref.offices_lookup` (office_id, office_name, base_url, secret_block_name)
+* **Static roster** – `Ref.offices_lookup` (office_id, office_name, base_url, secret_block_name_key, secret_block_name_token)
 * **Dynamic watermark** – `RAW.REF.office_entity_watermark` (office_id, entity_name, last_run_utc)
 * **Prefect blocks** – secret creds (`fieldroutes‑<OfficeName>‑auth‑key`), Snowflake connector `snowflake-altapestdb`
 """
@@ -76,11 +76,12 @@ def fetch_entity(
     logger = get_run_logger()
     office_id        = office_row["office_id"]
     base_url         = office_row["base_url"]
-    secret_block     = office_row["secret_block_name"]
+    secret_block_key = office_row["secret_block_name_key"]
+    secret_block_token = office_row["secret_block_name_token"]
 
-    auth_vals  = json.loads(Secret.load(secret_block).get())
-    auth       = {"authenticationKey": auth_vals["authenticationKey"],
-                  "authenticationToken": auth_vals["authenticationToken"]}
+    auth_key  = Secret.load(secret_block_key).get()
+    auth_token = Secret.load(secret_block_token).get()
+    auth = {"authenticationKey": auth_key, "authenticationToken": auth_token}
 
     # Build /search payload
     payload = {"officeIDs": office_id, **auth, "includeData": 1 if (small_volume and window_start) else 0}
@@ -173,7 +174,7 @@ def run_nightly_fieldroutes_etl():
         cur = sf_conn.cursor()
         cur.execute(
             """
-            SELECT o.office_id, o.office_name, o.base_url, o.secret_block_name,
+            SELECT o.office_id, o.office_name, o.base_url, o.secret_block_name_key, o.secret_block_name_token,
                    w.entity_name, w.last_run_utc
             FROM   Ref.offices_lookup  o
             JOIN   RAW.REF.office_entity_watermark w USING (office_id);
@@ -182,14 +183,15 @@ def run_nightly_fieldroutes_etl():
         rows = cur.fetchall()
 
     offices: Dict[int, Dict] = {}
-    for office_id, office_name, base_url, secret_block, entity_name, last_run in rows:
+    for office_id, office_name, base_url, secret_block_key, secret_block_token, entity_name, last_run in rows:
         offices.setdefault(
             office_id,
             {
                 "office_id": office_id,
                 "office_name": office_name,
                 "base_url": base_url,
-                "secret_block_name": secret_block,
+                "secret_block_name_key": secret_block_key   ,
+                "secret_block_name_token": secret_block_token,
                 "watermarks": {},
             },
         )
