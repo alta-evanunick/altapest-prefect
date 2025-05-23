@@ -168,6 +168,7 @@ def fetch_entity(
 def run_nightly_fieldroutes_etl():
     logger      = get_run_logger()
     now = datetime.datetime.now(datetime.UTC)
+    yesterday = now - datetime.timedelta(days=1)
 
     sf_block = SnowflakeConnector.load("snowflake-altapestdb")
     with sf_block.get_connection() as sf_conn:     # or .connect() on older plugin
@@ -206,7 +207,7 @@ def run_nightly_fieldroutes_etl():
                 table_name=table_name,
                 is_dim=is_dim,
                 small_volume=small_vol,
-                window_start=office["watermarks"].get(api_e),
+                window_start=yesterday, # office["watermarks"].get(api_e),
                 window_end=now,
             )
 
