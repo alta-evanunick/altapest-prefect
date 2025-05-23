@@ -17,8 +17,9 @@ deployments:
           repository: https://github.com/alta-evanunick/altapest-prefect.git
           branch: main
           credentials: "{{ prefect.blocks.github-credentials.github-evanunick }}"
-      - prefect.deployments.steps.pip_install_requirements:
-          requirements_file: "requirements.txt"
+      - prefect.deployments.steps.shell_script:
+          id: install-requirements
+          script: "pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity"
   - name: fieldroutes-cdc
     flow_name: FieldRoutes_CDC_Flow
     entrypoint: flows/deploy_flows.py:run_cdc_fieldroutes_etl
@@ -35,5 +36,6 @@ deployments:
           repository: https://github.com/alta-evanunick/altapest-prefect.git
           branch: main
           credentials: "{{ prefect.blocks.github-credentials.github-evanunick }}"
-      - prefect.deployments.steps.pip_install_requirements:
-          requirements_file: "requirements.txt"
+      - prefect.deployments.steps.shell_script:
+          id: install-requirements
+          script: "pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity"
