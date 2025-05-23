@@ -126,7 +126,7 @@ def fetch_entity(
         cur = sf_conn.cursor()
         # RAW layer (verbatim JSON)
         cur.executemany(
-            f"INSERT INTO RAW.fieldroutes.{table_name}_RAW (officeid, loaddatetimeutc, rawdata) VALUES (%s,%s,PARSE_JSON(%s))",
+            f"INSERT INTO RAW.fieldroutes.{table_name} (officeid, loaddatetimeutc, rawdata) VALUES (%s,%s,PARSE_JSON(%s))",
             [(office_id, load_ts, json.dumps(r)) for r in records],
         )
         # STAGED – **placeholder** extraction (extend for real DDL later)
@@ -137,7 +137,7 @@ def fetch_entity(
                    loaddatetimeutc,
                    rawdata:'{entity}ID'::NUMBER       AS naturalid,
                    rawdata:'dateUpdated'::TIMESTAMP_NTZ AS dateupdated
-            FROM   RAW.fieldroutes.{table_name}_RAW
+            FROM   RAW.fieldroutes.{table_name}
             WHERE  loaddatetimeutc = '{load_ts}'
               AND  officeid = {office_id};
             """
