@@ -1,240 +1,192 @@
 from __future__ import annotations
 """
-Production ETL pipeline for FieldRoutes → Snowflake using Prefect 2.x.
-
-High‑level design
-=================
-1. **RAW layer** – land each API record _verbatim_ as JSON (`VARIANT`) so schema drift never causes data loss.
-2. **STAGED layer** – parse JSON → structured columns via Snowflake SQL (or dbt models).  This is where we create/alter tables and write the heavy DDL.
-3. **PROD layer** – `MERGE`/upsert from STAGED into analytics‑ready fact & dimension tables.
-
-This script only loads RAW and runs a *minimal* staging insert (a placeholder) — extend the `INSERT … SELECT` for each entity or hand it off to dbt.
-
-Prereqs
--------
-* **Static roster** – `Ref.offices_lookup` (office_id, office_name, base_url, secret_block_name_key, secret_block_name_token)
-* **Dynamic watermark** – `RAW.REF.office_entity_watermark` (office_id, entity_name, last_run_utc)
-* **Prefect blocks** – secret creds (`fieldroutes‑<OfficeName>‑auth‑key`), Snowflake connector `snowflake-altapestdb`
+FieldRoutes → Snowflake nightly ETL (Prefect 2.x)
+• GET requests with header‑based auth (AuthenticationKey / AuthenticationToken)
+• Entity‑specific date field (dateUpdated vs dateAdded)
+• Exponential back‑off on 5xx & network errors
+• Parent flow waits for all mapped tasks
 """
 
-import json
-import time
-import datetime
+import json, time, datetime, urllib.parse
 from typing import Dict, List
 import requests
-
 from prefect import flow, task, get_run_logger
 from prefect.blocks.system import Secret
 from prefect_snowflake import SnowflakeConnector
 
-# Entity configuration: (api_endpoint, prod_table_name, is_dimension, small_volume_flag)
-ENTITIES: List[tuple[str, str, bool, bool]] = [
-    # Dimensions – small, can full‑refresh
-    ("customer", "Customer_Dim", True, False),
-    ("employee", "Employee_Dim", True, False),
-    ("office", "Office_Dim", True, True),
-    ("region", "Region_Dim", True, True),
-    ("serviceType", "ServiceType_Dim", True, True),
-    ("customerSource", "CustomerSource_Dim", True, True),
-    ("genericFlag", "GenericFlag_Dim", True, True),
+# ─────────────────────────────────────────────────────────────────────────────
+# Entity metadata
+# ─────────────────────────────────────────────────────────────────────────────
+#   endpoint,         prod_table,   is_dim, includeData_small,  date_field
+ENTITY_META = [
+    ("customer",       "Customer_Dim",        True,  False, "dateUpdated"),
+    ("employee",       "Employee_Dim",        True,  False, "dateUpdated"),
+    ("office",         "Office_Dim",          True,   True, "dateAdded"),
+    ("region",         "Region_Dim",          True,   True, "dateAdded"),
+    ("serviceType",    "ServiceType_Dim",     True,   True, "dateAdded"),
+    ("customerSource", "CustomerSource_Dim",  True,   True, "dateAdded"),
+    ("genericFlag",    "GenericFlag_Dim",     True,   True, "dateAdded"),
 
-    # Fact / high‑volume – incremental
-    ("appointment", "Appointment_Fact", False, False),
-    ("subscription", "Subscription_Fact", False, False),
-    ("route", "Route_Fact", False, False),
-    ("ticket", "Ticket_Dim", False, False),
-    ("ticketItem", "TicketItem_Fact", False, False),
-    ("payment", "Payment_Fact", False, False),
-    ("appliedPayment", "AppliedPayment_Fact", False, False),
-    ("note", "Note_Fact", False, False),   
-    ("task", "Task_Fact", False, False),
-    ("appointmentReminder", "AppointmentReminder_Fact", False, False),
-    ("door", "DoorKnock_Fact", False, False),
-    ("disbursement", "FinancialTransaction_Fact", False, False),
-    ("chargeback", "FinancialTransaction_Fact", False, False),
-    ("flagAssignment", "FlagAssignment_Fact", False, False),
+    ("appointment",    "Appointment_Fact",    False, False, "dateUpdated"),
+    ("subscription",   "Subscription_Fact",   False, False, "dateUpdated"),
+    ("route",          "Route_Fact",          False, False, "dateUpdated"),
+    ("ticket",         "Ticket_Dim",          False, False, "dateUpdated"),
+    ("ticketItem",     "TicketItem_Fact",     False, False, "dateUpdated"),
+    ("payment",        "Payment_Fact",        False, False, "dateUpdated"),
+    ("appliedPayment", "AppliedPayment_Fact", False, False, "dateUpdated"),
+    ("note",           "Note_Fact",           False, False, "dateAdded"),
+    ("task",           "Task_Fact",           False, False, "dateAdded"),
+    ("appointmentReminder", "AppointmentReminder_Fact", False, False, "dateUpdated"),
+    ("door",           "DoorKnock_Fact",      False, False, "dateUpdated"),
+    ("disbursement",   "FinancialTransaction_Fact", False, False, "dateUpdated"),
+    ("chargeback",     "FinancialTransaction_Fact", False, False, "dateUpdated"),
+    ("flagAssignment", "FlagAssignment_Fact", False, False, "dateAdded"),
 ]
 
+# helper to chunk id lists
+chunk = lambda seq, size: (seq[i : i + size] for i in range(0, len(seq), size))
 
-def chunk(seq: list, size: int):
-    """Yield successive *size*-chunked lists from *seq*."""
-    for i in range(0, len(seq), size):
-        yield seq[i : i + size]
-
-
+# ─────────────────────────────────────────────────────────────────────────────
+# Task – fetch one entity for one office
+# ─────────────────────────────────────────────────────────────────────────────
 @task(retries=1, retry_delay_seconds=60)
-def fetch_entity(
-    office_row: Dict,
-    entity: str,
-    table_name: str,
-    is_dim: bool,
-    small_volume: bool,
-    window_start: datetime.datetime | None,
-    window_end: datetime.datetime,
-):
-    """Extract & load *entity* for a single office, then update watermark."""
+def fetch_entity(office: Dict, meta: Dict, window_start: datetime.datetime | None, window_end: datetime.datetime):
     logger = get_run_logger()
-    office_id        = office_row["office_id"]
-    base_url         = office_row["base_url"]
-    secret_block_key = office_row["secret_block_name_key"]
-    secret_block_token = office_row["secret_block_name_token"]
+    logger.info("🚀 Nightly FieldRoutes ETL flow started")
 
-    auth_key  = Secret.load(secret_block_key).get()
-    auth_token = Secret.load(secret_block_token).get()
-    auth = {"authenticationKey": auth_key, "authenticationToken": auth_token}
+    entity       = meta["endpoint"]
+    table_name   = meta["table"]
+    date_field   = meta["date_field"]
+    includeData  = 1 if (meta["small"] and window_start) else 0
 
-    # Build /search payload
-    payload = {"officeIDs": office_id, **auth, "includeData": 1 if (small_volume and window_start) else 0}
-    if window_start and not is_dim:
-        payload["dateUpdatedStart"] = window_start.strftime("%Y-%m-%dT%H:%M:%SZ")
-        payload["dateUpdatedEnd"]   = window_end.strftime("%Y-%m-%dT%H:%M:%SZ")
+    base_url     = office["base_url"]
+    headers = {
+        "AuthenticationKey":   office["auth_key"],
+        "AuthenticationToken": office["auth_token"],
+    }
 
-    # --- /search with retry
+    # build query params
+    params = {
+        "officeIDs": office["office_id"],
+        "includeData": includeData,
+    }
+    # FieldRoutes expects complex filters in JSON‑string form, e.g.
+    #   dateCreated={"operator":"BETWEEN","value":["2025-01-01","2025-01-31"]}
+    if window_start and not meta["is_dim"]:
+        params[date_field] = json.dumps({
+            "operator": "BETWEEN",
+            "value": [
+                window_start.strftime("%Y-%m-%d"),
+                window_end.strftime("%Y-%m-%d")
+            ]
+        })
+
+    # ── /search with retry ──────────────────────────────────────────────────
     for attempt in range(5):
         try:
-            resp = requests.get(
-                f"{base_url}/{entity}/search",
-                json=payload,
-                timeout=30,
-            )
+            resp = requests.get(f"{base_url}/{entity}/search", headers=headers, params=params, timeout=30)
             resp.raise_for_status()
-            break  # ✅ success
+            break
         except requests.HTTPError as e:
-            # retry ONLY on 5xx
             if e.response is not None and e.response.status_code >= 500:
-                time.sleep(2 ** attempt)       # exponential back-off
-                continue                       # 🔁 retry
-            else:
-                raise                          # 4xx is fatal
+                time.sleep(2 ** attempt); continue
+            raise
         except Exception:
-            # network error, DNS, etc. – treat like 5xx
             time.sleep(2 ** attempt)
     else:
-        # loop exhausted
-        raise RuntimeError(
-            f"{entity}/search failed after 5 retries for office {office_id}"
-        )
+        raise RuntimeError(f"{entity}/search failed after retries – office {office['office_id']}")
 
-    data           = resp.json()
-    records        = data.get("resolvedObjects", []) or data.get("ResolvedObjects", [])
-    unresolved_ids = data.get(f"{entity}IDsNoDataExported", [])
+    data = resp.json()
+    records = data.get("resolvedObjects", []) or data.get("ResolvedObjects", [])
+    unresolved = data.get(f"{entity}IDsNoDataExported", [])
 
-    # --- /get pagination
-    for id_chunk in chunk(unresolved_ids, 1000):
+    # ── /get chunks ─────────────────────────────────────────────────────────
+    for id_chunk in chunk(unresolved, 1000):
+        chunk_params = [(f"{entity}IDs", str(id)) for id in id_chunk]
+        qs = urllib.parse.urlencode(chunk_params, doseq=True)
         for attempt in range(5):
             try:
-                bulk = requests.get(f"{base_url}/{entity}/get", json={f"{entity}IDs": id_chunk, **auth}, timeout=30)
-                bulk.raise_for_status()
-                break
+                bulk = requests.get(f"{base_url}/{entity}/get?{qs}", headers=headers, timeout=30)
+                bulk.raise_for_status(); break
             except Exception:
-                if attempt == 4:
-                    raise
+                if attempt == 4: raise
                 time.sleep(2 ** attempt)
         bulk_data = bulk.json()
         records.extend(bulk_data if isinstance(bulk_data, list) else bulk_data.get("resolvedObjects", []))
 
-    logger.info(f"Office {office_id} – {entity}: {len(records)} records fetched")
+    logger.info(f"Office {office['office_id']} – {entity}: {len(records)} records")
 
+    # ── Load to Snowflake ───────────────────────────────────────────────────
     load_ts = window_end.strftime("%Y-%m-%d %H:%M:%S")
-    sf_block = SnowflakeConnector.load("snowflake-altapestdb")
-    with sf_block.get_connection() as sf_conn:     # or .connect() on older plugin
-        cur = sf_conn.cursor()
-        # RAW layer (verbatim JSON)
+    sf = SnowflakeConnector.load("snowflake-altapestdb").get_connection()
+    with sf as conn:
+        cur = conn.cursor()
         cur.executemany(
-            f"INSERT INTO RAW.fieldroutes.{table_name} (officeid, loaddatetimeutc, rawdata) VALUES (%s,%s,PARSE_JSON(%s))",
-            [(office_id, load_ts, json.dumps(r)) for r in records],
+            f"INSERT INTO RAW.fieldroutes.{table_name} (OfficeID, LoadDatetimeUTC, RawData) VALUES (%s,%s,PARSE_JSON(%s))",
+            [(office["office_id"], load_ts, json.dumps(r)) for r in records],
         )
-        # STAGED – **placeholder** extraction (extend for real DDL later)
+        # watermark
         cur.execute(
-            f"""
-            INSERT INTO STAGED.fieldroutes.{table_name}
-            SELECT officeid,
-                   loaddatetimeutc,
-                   rawdata:'{entity}ID'::NUMBER       AS naturalid,
-                   rawdata:'dateUpdated'::TIMESTAMP_NTZ AS dateupdated
-            FROM   RAW.fieldroutes.{table_name}
-            WHERE  loaddatetimeutc = '{load_ts}'
-              AND  officeid = {office_id};
-            """
+            "UPDATE RAW.REF.office_entity_watermark SET last_run_utc = %s WHERE office_id = %s AND entity_name = %s",
+            (load_ts, office["office_id"], entity),
         )
-        # PROD merge
-        cur.execute(
-            f"""
-            MERGE INTO PROD.fieldroutes.{table_name} T
-            USING STAGED.fieldroutes.{table_name} S
-              ON T.officeid = S.officeid AND T.naturalid = S.naturalid
-            WHEN MATCHED THEN
-              UPDATE SET dateupdated      = S.dateupdated,
-                         loaddatetimeutc = S.loaddatetimeutc
-            WHEN NOT MATCHED THEN
-              INSERT (officeid, naturalid, dateupdated, loaddatetimeutc)
-              VALUES (S.officeid, S.naturalid, S.dateupdated, S.loaddatetimeutc);
-            """
-        )
-        # Watermark update
-        cur.execute(
-            """UPDATE RAW.REF.office_entity_watermark SET last_run_utc = %s WHERE office_id = %s AND entity_name = %s""",
-            (load_ts, office_id, entity),
-        )
-        sf_conn.commit()
+        conn.commit()
 
-
+# ─────────────────────────────────────────────────────────────────────────────
+# Flow – nightly full load
+# ─────────────────────────────────────────────────────────────────────────────
 @flow(name="FieldRoutes_Nightly_ETL")
 def run_nightly_fieldroutes_etl():
-    logger      = get_run_logger()
+    logger = get_run_logger()
     now = datetime.datetime.now(datetime.UTC)
-    yesterday = now - datetime.timedelta(days=1)
+    yday = now - datetime.timedelta(days=1)
 
-    sf_block = SnowflakeConnector.load("snowflake-altapestdb")
-    with sf_block.get_connection() as sf_conn:     # or .connect() on older plugin
-        cur = sf_conn.cursor()
-        cur.execute(
-            """
-            SELECT o.office_id, o.office_name, o.base_url, o.secret_block_name_key, o.secret_block_name_token,
+    # pull roster + watermarks
+    sf = SnowflakeConnector.load("snowflake-altapestdb").get_connection()
+    with sf as conn:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT o.office_id, o.office_name, o.base_url,
+                   o.secret_block_name_key, o.secret_block_name_token,
                    w.entity_name, w.last_run_utc
-            FROM   Ref.offices_lookup  o
+            FROM   Ref.offices_lookup o
             JOIN   RAW.REF.office_entity_watermark w USING (office_id);
-            """
-        )
+        """)
         rows = cur.fetchall()
 
     offices: Dict[int, Dict] = {}
-    for office_id, office_name, base_url, secret_block_key, secret_block_token, entity_name, last_run in rows:
-        offices.setdefault(
-            office_id,
-            {
-                "office_id": office_id,
-                "office_name": office_name,
-                "base_url": base_url,
-                "secret_block_name_key": secret_block_key   ,
-                "secret_block_name_token": secret_block_token,
-                "watermarks": {},
-            },
-        )
+    for office_id, name, url, key_blk, tok_blk, entity_name, last_run in rows:
+        offices.setdefault(office_id, {
+            "office_id": office_id,
+            "office_name": name,
+            "base_url": url,
+            "auth_key": Secret.load(key_blk).get(),
+            "auth_token": Secret.load(tok_blk).get(),
+            "watermarks": {},
+        })
         offices[office_id]["watermarks"][entity_name] = last_run
 
-    # --- launch tasks
+    # submit & await
     futures = []
+    meta_list = [
+        {"endpoint": ep, "table": tbl, "is_dim": dim, "small": small, "date_field": df}
+        for ep, tbl, dim, small, df in ENTITY_META
+    ]
+
     for office in offices.values():
-        for api_e, table_name, is_dim, small_vol in ENTITIES:
+        for meta in meta_list:
             fut = fetch_entity.submit(
-                office_row=office,
-                entity=api_e,
-                table_name=table_name,
-                is_dim=is_dim,
-                small_volume=small_vol,
-                window_start=yesterday, # office["watermarks"].get(api_e),
+                office=office,
+                meta=meta,
+                window_start=yday,
                 window_end=now,
             )
             futures.append(fut)
 
-    # --- wait for completion; raise if any crashed
     for fut in futures:
-        try:
-            fut.result()        # blocks until that task finishes or fails
-        except Exception as exc:
-            logger.error(f"Sub-task crashed: {exc}")
-            raise
+        fut.result()   # will raise if any task crashed
+
+    logger.info("✅ Nightly FieldRoutes ETL flow finished")
 
 if __name__ == "__main__":
     run_nightly_fieldroutes_etl()
