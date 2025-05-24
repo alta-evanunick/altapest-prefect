@@ -30,8 +30,8 @@ from prefect_snowflake import SnowflakeConnector
 # Entity configuration: (api_endpoint, prod_table_name, is_dimension, small_volume_flag)
 ENTITIES: List[tuple[str, str, bool, bool]] = [
     # Dimensions – small, can full‑refresh
-    ("customer", "Customer_Dim", True, True),
-    ("employee", "Employee_Dim", True, True),
+    ("customer", "Customer_Dim", True, False),
+    ("employee", "Employee_Dim", True, False),
     ("office", "Office_Dim", True, True),
     ("region", "Region_Dim", True, True),
     ("serviceType", "ServiceType_Dim", True, True),
@@ -46,7 +46,7 @@ ENTITIES: List[tuple[str, str, bool, bool]] = [
     ("ticketItem", "TicketItem_Fact", False, False),
     ("payment", "Payment_Fact", False, False),
     ("appliedPayment", "AppliedPayment_Fact", False, False),
-    ("note", "Note_Fact", False, True),   # low‑volume so includeData is OK
+    ("note", "Note_Fact", False, False),   
     ("task", "Task_Fact", False, False),
     ("appointmentReminder", "AppointmentReminder_Fact", False, False),
     ("door", "DoorKnock_Fact", False, False),
@@ -92,13 +92,28 @@ def fetch_entity(
     # --- /search with retry
     for attempt in range(5):
         try:
-            resp = requests.post(f"{base_url}/{entity}/search", json=payload, timeout=30)
+            resp = requests.post(
+                f"{base_url}/{entity}/search",
+                json=payload,
+                timeout=30,
+            )
             resp.raise_for_status()
-            break
-        except Exception as e:
-            if attempt == 4:
-                raise
+            break  # ✅ success
+        except requests.HTTPError as e:
+            # retry ONLY on 5xx
+            if e.response is not None and e.response.status_code >= 500:
+                time.sleep(2 ** attempt)       # exponential back-off
+                continue                       # 🔁 retry
+            else:
+                raise                          # 4xx is fatal
+        except Exception:
+            # network error, DNS, etc. – treat like 5xx
             time.sleep(2 ** attempt)
+    else:
+        # loop exhausted
+        raise RuntimeError(
+            f"{entity}/search failed after 5 retries for office {office_id}"
+        )
 
     data           = resp.json()
     records        = data.get("resolvedObjects", []) or data.get("ResolvedObjects", [])
