@@ -92,7 +92,7 @@ def fetch_entity(
     # --- /search with retry
     for attempt in range(5):
         try:
-            resp = requests.post(
+            resp = requests.get(
                 f"{base_url}/{entity}/search",
                 json=payload,
                 timeout=30,
@@ -123,7 +123,7 @@ def fetch_entity(
     for id_chunk in chunk(unresolved_ids, 1000):
         for attempt in range(5):
             try:
-                bulk = requests.post(f"{base_url}/{entity}/get", json={f"{entity}IDs": id_chunk, **auth}, timeout=30)
+                bulk = requests.get(f"{base_url}/{entity}/get", json={f"{entity}IDs": id_chunk, **auth}, timeout=30)
                 bulk.raise_for_status()
                 break
             except Exception:
