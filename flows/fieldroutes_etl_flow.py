@@ -199,6 +199,7 @@ def run_nightly_fieldroutes_etl():
         offices[office_id]["watermarks"][entity_name] = last_run
 
     # --- launch tasks
+    futures = []
     for office in offices.values():
         for api_e, table_name, is_dim, small_vol in ENTITIES:
             fetch_entity.submit(
@@ -211,6 +212,15 @@ def run_nightly_fieldroutes_etl():
                 window_end=now,
             )
 
+            futures.append(fut)
+
+    # --- wait for completion; raise if any crashed
+    for fut in futures:
+        try:
+            fut.result()        # blocks until that task finishes or fails
+        except Exception as exc:
+            logger.error(f"Sub-task crashed: {exc}")
+            raise
 
 if __name__ == "__main__":
     run_nightly_fieldroutes_etl()
