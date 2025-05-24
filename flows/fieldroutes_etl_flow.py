@@ -202,7 +202,7 @@ def run_nightly_fieldroutes_etl():
     futures = []
     for office in offices.values():
         for api_e, table_name, is_dim, small_vol in ENTITIES:
-            fetch_entity.submit(
+            fut = fetch_entity.submit(
                 office_row=office,
                 entity=api_e,
                 table_name=table_name,
@@ -211,7 +211,6 @@ def run_nightly_fieldroutes_etl():
                 window_start=yesterday, # office["watermarks"].get(api_e),
                 window_end=now,
             )
-
             futures.append(fut)
 
     # --- wait for completion; raise if any crashed
