@@ -3,7 +3,7 @@ import time
 from typing import Dict, List
 from prefect import flow, task, get_run_logger
 from prefect_snowflake import SnowflakeConnector
-from prefect.task_runners import ConcurrentTaskRunner
+from prefect.task_runners import ConcurrentTaskRunner, SequentialTaskRunner
 from flows.fieldroutes_etl_flow import fetch_entity, ENTITY_META
 
 # Define high-velocity entities for CDC
@@ -12,7 +12,7 @@ CDC_ENTITIES = [
     "appliedPayment", "route", "subscription"
 ]
 
-@flow(name="FieldRoutes_Nightly_ETL", task_runner=ConcurrentTaskRunner())
+@flow(name="FieldRoutes_Nightly_ETL", task_runner=SequentialTaskRunner())
 def run_nightly_fieldroutes_etl():
     """
     Prefect flow to perform a full nightly extract for all offices and entities.
@@ -77,31 +77,27 @@ def run_nightly_fieldroutes_etl():
     for office_idx, office in enumerate(sorted_offices, 1):
         logger.info(f"🏢 Processing office {office_idx}/{len(sorted_offices)}: {office['office_id']} ({office['office_name']})")
         
-        office_futures = []
         office_success = 0
         office_failed = 0
-        
-        # Submit all entities for this office concurrently
+
+        # Process each entity sequentially for this office
         for entity_name, meta in meta_dict.items():
-            future = fetch_entity.submit(
-                office=office,
-                meta=meta,
-                window_start=window_start,
-                window_end=window_end
-            )
-            office_futures.append((entity_name, future))
-        
-        logger.info(f"📋 Submitted {len(office_futures)} entity tasks for office {office['office_id']}")
-        
-        # Wait for all entities in this office to complete
-        for entity_name, future in office_futures:
             try:
-                future.result()
+                fetch_entity(
+                    office=office,
+                    meta=meta,
+                    window_start=window_start,
+                    window_end=window_end
+                )
                 office_success += 1
-                logger.info(f"✅ {entity_name} completed for office {office['office_id']}")
+                logger.info(
+                    f"✅ {entity_name} completed for office {office['office_id']}"
+                )
             except Exception as exc:
                 office_failed += 1
-                logger.error(f"❌ {entity_name} failed for office {office['office_id']}: {exc}")
+                logger.error(
+                    f"❌ {entity_name} failed for office {office['office_id']}: {exc}"
+                )
         
         # Log office completion summary
         logger.info(f"🏢 Office {office['office_id']} completed: {office_success} success, {office_failed} failed")
@@ -127,7 +123,7 @@ def run_nightly_fieldroutes_etl():
     else:
         logger.info("🎉 Nightly FieldRoutes ETL completed successfully")
 
-@flow(name="FieldRoutes_CDC_ETL", task_runner=ConcurrentTaskRunner())
+@flow(name="FieldRoutes_CDC_ETL", task_runner=SequentialTaskRunner())
 def run_cdc_fieldroutes_etl():
     """
     CDC flow for high-velocity tables using watermarks.
@@ -191,11 +187,10 @@ def run_cdc_fieldroutes_etl():
     for office_idx, office in enumerate(sorted_offices, 1):
         logger.info(f"🏢 CDC processing office {office_idx}/{len(sorted_offices)}: {office['office_id']} ({office['office_name']})")
         
-        office_futures = []
         office_success = 0
         office_failed = 0
-        
-        # Submit CDC tasks with proper windows based on watermarks
+
+        # Process CDC tasks sequentially with proper windows based on watermarks
         for entity_name, meta in meta_dict.items():
             # Use watermark as start time, with 15-minute overlap for safety
             last_run = office["watermarks"].get(entity_name)
@@ -204,26 +199,23 @@ def run_cdc_fieldroutes_etl():
             else:
                 # First run - get last 2 hours
                 window_start = now - datetime.timedelta(hours=2)
-            
-            future = fetch_entity.submit(
-                office=office,
-                meta=meta,
-                window_start=window_start,
-                window_end=now
-            )
-            office_futures.append((entity_name, future))
-        
-        logger.info(f"📋 Submitted {len(office_futures)} CDC tasks for office {office['office_id']}")
-        
-        # Wait for all CDC entities in this office to complete
-        for entity_name, future in office_futures:
+
             try:
-                future.result()
+                fetch_entity(
+                    office=office,
+                    meta=meta,
+                    window_start=window_start,
+                    window_end=now
+                )
                 office_success += 1
-                logger.info(f"✅ CDC {entity_name} completed for office {office['office_id']}")
+                logger.info(
+                    f"✅ CDC {entity_name} completed for office {office['office_id']}"
+                )
             except Exception as exc:
                 office_failed += 1
-                logger.error(f"❌ CDC {entity_name} failed for office {office['office_id']}: {exc}")
+                logger.error(
+                    f"❌ CDC {entity_name} failed for office {office['office_id']}: {exc}"
+                )
         
         # Log office completion summary
         logger.info(f"🏢 Office {office['office_id']} CDC completed: {office_success} success, {office_failed} failed")
