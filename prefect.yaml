@@ -10,10 +10,10 @@ deployments:
     tags: ["fieldroutes", "nightly", "full-extract"]
     work_pool:
       name: default-work-pool
-      job_variables:
-        # Optional: Add resource requirements for larger workloads
-        cpu: 2
-        memory: "4Gi"
+      # job_variables:
+      #   # Optional: Add resource requirements for larger workloads
+      #   cpu: 2
+      #   memory: "4Gi"
     parameters: {} 
     pull:
       - prefect.deployments.steps.git_clone:
@@ -24,6 +24,7 @@ deployments:
       - prefect.deployments.steps.run_shell_script:
           id: install_requirements
           script: |
+            cd altapest-prefect
             pip install -r requirements.txt
             # Verify Snowflake connection
             python -c "from prefect_snowflake import SnowflakeConnector; print('Snowflake connector available')"
@@ -50,6 +51,7 @@ deployments:
       - prefect.deployments.steps.run_shell_script:
           id: install_requirements
           script: |
+            cd altapest-prefect
             pip install -r requirements.txt
             # Verify all dependencies
             python -c "import prefect, prefect_snowflake, snowflake.connector, requests, pandas, pyarrow, tenacity; print('All dependencies loaded')"
@@ -71,4 +73,6 @@ deployments:
           branch: develop  # Use develop branch for testing
           credentials: "{{ prefect.blocks.github-credentials.github-evanunick }}"
       - prefect.deployments.steps.run_shell_script:
-          script: "pip install -r requirements.txt"
+          script: |
+            cd altapest-prefect
+            pip install -r requirements.txt
