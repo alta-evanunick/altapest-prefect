@@ -61,26 +61,26 @@ def run_cdc_fieldroutes_etl():
     
     logger.info(f"Processing {len(cdc_entities)} high-velocity entities for {len(offices)} offices")
     
-    # Submit tasks for parallel execution
-    futures = []
-    for office in offices:
-        for meta in cdc_entities:
-            fut = fetch_entity.submit(
-                office=office,
-                meta=meta,
-                window_start=window_start,
-                window_end=window_end,
-            )
-            futures.append(fut)
-    
-    # Wait for all tasks to complete
+    # Process each office/entity pair sequentially
     failed_count = 0
-    for fut in futures:
-        try:
-            fut.result()
-        except Exception as exc:
-            logger.error(f"CDC task failed: {exc}")
-            failed_count += 1
+    for office in offices:
+        logger.info(f"🏢 Processing office {office['office_id']} ({office['office_name']})")
+        for meta in cdc_entities:
+            try:
+                fetch_entity(
+                    office=office,
+                    meta=meta,
+                    window_start=window_start,
+                    window_end=window_end,
+                )
+                logger.info(
+                    f"✅ CDC {meta['endpoint']} completed for office {office['office_id']}"
+                )
+            except Exception as exc:
+                logger.error(
+                    f"❌ CDC {meta['endpoint']} failed for office {office['office_id']}: {exc}"
+                )
+                failed_count += 1
     
     if failed_count > 0:
         logger.warning(f"CDC flow completed with {failed_count} failures")
