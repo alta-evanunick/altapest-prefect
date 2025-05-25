@@ -24,8 +24,8 @@ deployments:
       - prefect.deployments.steps.run_shell_script:
           id: install_requirements
           script: |
-            cd altapest-prefect
-            pip install -r requirements.txt
+            # Install packages directly
+            pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity
             # Verify Snowflake connection
             python -c "from prefect_snowflake import SnowflakeConnector; print('Snowflake connector available')"
   
@@ -51,8 +51,8 @@ deployments:
       - prefect.deployments.steps.run_shell_script:
           id: install_requirements
           script: |
-            cd altapest-prefect
-            pip install -r requirements.txt
+            # Install packages directly
+            pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity
             # Verify all dependencies
             python -c "import prefect, prefect_snowflake, snowflake.connector, requests, pandas, pyarrow, tenacity; print('All dependencies loaded')"
 
@@ -74,5 +74,5 @@ deployments:
           credentials: "{{ prefect.blocks.github-credentials.github-evanunick }}"
       - prefect.deployments.steps.run_shell_script:
           script: |
-            cd altapest-prefect
-            pip install -r requirements.txt
+            # Install packages directly
+            pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity
