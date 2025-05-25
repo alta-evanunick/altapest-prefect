@@ -1,19 +1,14 @@
-# prefect.yaml - deployment configurations for FieldRoutes ETL flows
 deployments:
   - name: fieldroutes-nightly
     flow_name: FieldRoutes_Nightly_ETL
     entrypoint: flows/deploy_flows.py:run_nightly_fieldroutes_etl
     schedule:
-      cron: "0 6 * * *"            # run daily at 6:00 AM Mountain Time
+      cron: "0 6 * * *"            
       timezone: "America/Denver"
     description: "Nightly full extract of all FieldRoutes entities for all offices."
     tags: ["fieldroutes", "nightly", "full-extract"]
     work_pool:
       name: default-work-pool
-      # job_variables:
-      #   # Optional: Add resource requirements for larger workloads
-      #   cpu: 2
-      #   memory: "4Gi"
     parameters: {} 
     pull:
       - prefect.deployments.steps.git_clone:
@@ -24,24 +19,19 @@ deployments:
       - prefect.deployments.steps.run_shell_script:
           id: install_requirements
           script: |
-            # Install packages directly
             pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity
-            # Verify Snowflake connection
             python -c "from prefect_snowflake import SnowflakeConnector; print('Snowflake connector available')"
   
   - name: fieldroutes-cdc
     flow_name: FieldRoutes_CDC_ETL
     entrypoint: flows/deploy_flows.py:run_cdc_fieldroutes_etl
     schedule:
-      cron: "0 8-17/2 * * 1-5"     # run every 2 hours between 8:00-17:00, Monday-Friday
+      cron: "0 8-17/2 * * 1-5"
       timezone: "America/Denver"
     description: "2-hour interval CDC for high-velocity FieldRoutes tables during business hours."
     tags: ["fieldroutes", "cdc", "incremental"]
     work_pool:
       name: default-work-pool
-      # job_variables:
-      #   cpu: 1
-      #   memory: "2Gi"
     parameters: {}
     pull:
       - prefect.deployments.steps.git_clone:
@@ -51,12 +41,9 @@ deployments:
       - prefect.deployments.steps.run_shell_script:
           id: install_requirements
           script: |
-            # Install packages directly
             pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity
-            # Verify all dependencies
             python -c "import prefect, prefect_snowflake, snowflake.connector, requests, pandas, pyarrow, tenacity; print('All dependencies loaded')"
 
-# Development deployment for testing
   - name: fieldroutes-dev
     flow_name: FieldRoutes_Nightly_ETL
     entrypoint: flows/deploy_flows.py:run_nightly_fieldroutes_etl
@@ -65,14 +52,12 @@ deployments:
     work_pool:
       name: default-work-pool
     parameters:
-      # Can override parameters for testing specific offices/entities
       test_mode: true
     pull:
       - prefect.deployments.steps.git_clone:
           repository: https://github.com/alta-evanunick/altapest-prefect.git
-          branch: develop  # Use develop branch for testing
+          branch: develop  
           credentials: "{{ prefect.blocks.github-credentials.github-evanunick }}"
       - prefect.deployments.steps.run_shell_script:
           script: |
-            # Install packages directly
             pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity
