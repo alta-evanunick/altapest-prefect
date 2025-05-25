@@ -224,8 +224,8 @@ def fetch_entity(
             """, (load_timestamp, total_loaded, office["office_id"], entity))
             
             conn.commit()
-            logger.info(f"✅ Successfully loaded {total_loaded} records for {entity}")
-            
+            logger.info(f"Successfully loaded {total_loaded} records for {entity}")
+
     except Exception as e:
         logger.error(f"Snowflake load failed for {entity}: {str(e)}")
         raise
@@ -247,7 +247,7 @@ def log_extraction_summary(results: List[Tuple[str, int, int]]):
     logger.info("EXTRACTION SUMMARY")
     logger.info("="*60)
     for entity, fetched, loaded in results:
-        status = "✅" if fetched == loaded else "⚠️"
+        status = "done" if fetched == loaded else "warning"
         logger.info(f"{status} {entity}: Fetched={fetched}, Loaded={loaded}")
     logger.info(f"TOTAL: Fetched={total_fetched}, Loaded={total_loaded}")
     logger.info("="*60)
@@ -282,7 +282,7 @@ def validate_snowflake_schema() -> bool:
             logger.error(f"Missing tables in Snowflake: {missing_tables}")
             return False
         
-        logger.info("✅ All required tables exist in Snowflake")
+        logger.info("All required tables exist in Snowflake")
         return True
         
     except Exception as e:
