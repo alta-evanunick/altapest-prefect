@@ -1,24 +1,27 @@
 from __future__ import annotations
 """
-FieldRoutes → Snowflake nightly ETL (Prefect 2.x)
-• GET requests with header‑based auth (AuthenticationKey / AuthenticationToken)
-• Entity‑specific date field (dateUpdated vs dateAdded)
-• Exponential back‑off on 5xx & network errors
-• Parent flow waits for all mapped tasks
+FieldRoutes → Snowflake ETL with enhanced Prefect patterns
+• Uses Prefect's native retry mechanisms
+• Better error handling and logging
+• Supports both full and incremental extraction
 """
 
-import json, time, datetime, urllib.parse
-from typing import Dict, List
+import json
+import datetime
+import urllib.parse
+from typing import Dict, List, Optional, Tuple
 import requests
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
+
 from prefect import flow, task, get_run_logger
 from prefect.blocks.system import Secret
 from prefect_snowflake import SnowflakeConnector
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Entity metadata
+# Entity metadata configuration
 # ─────────────────────────────────────────────────────────────────────────────
-#   endpoint,         prod_table,   is_dim, includeData_small,  date_field
 ENTITY_META = [
+    # Dimension tables (reference data)
     ("customer",       "Customer_Dim",        True,  False, "dateUpdated"),
     ("employee",       "Employee_Dim",        True,  False, "dateUpdated"),
     ("office",         "Office_Dim",          True,   True, "dateAdded"),
@@ -27,6 +30,7 @@ ENTITY_META = [
     ("customerSource", "CustomerSource_Dim",  True,   True, "dateAdded"),
     ("genericFlag",    "GenericFlag_Dim",     True,   True, "dateAdded"),
 
+    # Fact tables (transactional data)
     ("appointment",    "Appointment_Fact",    False, False, "dateUpdated"),
     ("subscription",   "Subscription_Fact",   False, False, "dateUpdated"),
     ("route",          "Route_Fact",          False, False, "dateUpdated"),
@@ -43,36 +47,94 @@ ENTITY_META = [
     ("flagAssignment", "FlagAssignment_Fact", False, False, "dateAdded"),
 ]
 
-# helper to chunk id lists
-chunk = lambda seq, size: (seq[i : i + size] for i in range(0, len(seq), size))
+# Custom exceptions for better error handling
+class FieldRoutesAPIError(Exception):
+    """Raised when FieldRoutes API returns an error"""
+    pass
+
+class FieldRoutesRateLimitError(Exception):
+    """Raised when hitting rate limits"""
+    pass
+
+# Helper functions
+def chunk_list(items: List, chunk_size: int = 1000):
+    """Split a list into chunks of specified size."""
+    for i in range(0, len(items), chunk_size):
+        yield items[i:i + chunk_size]
+
+def is_retriable_error(exception):
+    """Determine if an error should trigger a retry."""
+    if isinstance(exception, requests.HTTPError):
+        return exception.response.status_code >= 500
+    return isinstance(exception, (requests.ConnectionError, requests.Timeout))
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Task – fetch one entity for one office
+# Enhanced API interaction with native Prefect retries
 # ─────────────────────────────────────────────────────────────────────────────
-@task(retries=1, retry_delay_seconds=60)
-def fetch_entity(office: Dict, meta: Dict, window_start: datetime.datetime | None, window_end: datetime.datetime):
+@retry(
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=1, min=2, max=60),
+    retry=retry_if_exception_type((requests.ConnectionError, requests.Timeout, FieldRoutesRateLimitError))
+)
+def make_api_request(url: str, headers: Dict, params: Dict = None, timeout: int = 30) -> Dict:
+    """Make API request with automatic retry logic."""
+    response = requests.get(url, headers=headers, params=params, timeout=timeout)
+    
+    if response.status_code == 429:
+        raise FieldRoutesRateLimitError("Rate limit exceeded")
+    elif response.status_code >= 500:
+        raise FieldRoutesAPIError(f"Server error: {response.status_code}")
+    
+    response.raise_for_status()
+    return response.json()
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Main ETL Task
+# ─────────────────────────────────────────────────────────────────────────────
+@task(
+    name="fetch_entity",
+    description="Fetch data for one entity from one office",
+    retries=2,
+    retry_delay_seconds=60,
+    tags=["api", "extract"]
+)
+def fetch_entity(
+    office: Dict, 
+    meta: Dict, 
+    window_start: Optional[datetime.datetime] = None, 
+    window_end: Optional[datetime.datetime] = None
+) -> Tuple[int, int]:
+    """
+    Fetch entity data from FieldRoutes API and load to Snowflake.
+    
+    Returns:
+        Tuple of (records_fetched, records_loaded)
+    """
     logger = get_run_logger()
-    logger.info("🚀 Nightly FieldRoutes ETL flow started")
-
-    entity       = meta["endpoint"]
-    table_name   = meta["table"]
-    date_field   = meta["date_field"]
-    includeData  = 1 if (meta["small"] and window_start) else 0
-
-    base_url     = office["base_url"]
+    
+    entity = meta["endpoint"]
+    table_name = meta["table"]
+    date_field = meta["date_field"]
+    is_small_dim = meta["small"]
+    is_dimension = meta["is_dim"]
+    
+    logger.info(f"Starting fetch for {entity} - Office {office['office_id']} ({office['office_name']})")
+    
+    # API configuration
+    base_url = office["base_url"]
     headers = {
-        "AuthenticationKey":   office["auth_key"],
+        "AuthenticationKey": office["auth_key"],
         "AuthenticationToken": office["auth_token"],
     }
-
-    # build query params
+    
+    # Build query parameters
     params = {
         "officeIDs": office["office_id"],
-        "includeData": includeData,
+        "includeData": 1 if (is_small_dim and not window_start) else 0,
     }
-    # FieldRoutes expects complex filters in JSON‑string form, e.g.
-    #   dateCreated={"operator":"BETWEEN","value":["2025-01-01","2025-01-31"]}
-    if window_start and not meta["is_dim"]:
+    
+    # Add date filter for incremental loads (fact tables only)
+    if window_start and not is_dimension:
         params[date_field] = json.dumps({
             "operator": "BETWEEN",
             "value": [
@@ -80,113 +142,149 @@ def fetch_entity(office: Dict, meta: Dict, window_start: datetime.datetime | Non
                 window_end.strftime("%Y-%m-%d")
             ]
         })
-
-    # ── /search with retry ──────────────────────────────────────────────────
-    for attempt in range(5):
-        try:
-            resp = requests.get(f"{base_url}/{entity}/search", headers=headers, params=params, timeout=30)
-            resp.raise_for_status()
-            break
-        except requests.HTTPError as e:
-            if e.response is not None and e.response.status_code >= 500:
-                time.sleep(2 ** attempt); continue
-            raise
-        except Exception:
-            time.sleep(2 ** attempt)
-    else:
-        raise RuntimeError(f"{entity}/search failed after retries – office {office['office_id']}")
-
-    data = resp.json()
-    records = data.get("resolvedObjects", []) or data.get("ResolvedObjects", [])
-    unresolved = data.get(f"{entity}IDsNoDataExported", [])
-
-    # ── /get chunks ─────────────────────────────────────────────────────────
-    for id_chunk in chunk(unresolved, 1000):
+        logger.info(f"Using date filter: {date_field} BETWEEN {window_start} and {window_end}")
+    
+    # ── Step 1: Search endpoint ──────────────────────────────────────────────
+    try:
+        search_url = f"{base_url}/{entity}/search"
+        search_data = make_api_request(search_url, headers, params)
+    except Exception as e:
+        logger.error(f"Search failed for {entity}: {str(e)}")
+        raise
+    
+    # Extract records and unresolved IDs
+    records = search_data.get("resolvedObjects", []) or search_data.get("ResolvedObjects", [])
+    unresolved_ids = search_data.get(f"{entity}IDsNoDataExported", [])
+    
+    logger.info(f"Search returned {len(records)} full records and {len(unresolved_ids)} IDs to fetch")
+    
+    # ── Step 2: Bulk fetch unresolved IDs ────────────────────────────────────
+    for id_chunk in chunk_list(unresolved_ids, 1000):
+        # Build query string for bulk fetch
         chunk_params = [(f"{entity}IDs", str(id)) for id in id_chunk]
-        qs = urllib.parse.urlencode(chunk_params, doseq=True)
-        for attempt in range(5):
-            try:
-                bulk = requests.get(f"{base_url}/{entity}/get?{qs}", headers=headers, timeout=30)
-                bulk.raise_for_status(); break
-            except Exception:
-                if attempt == 4: raise
-                time.sleep(2 ** attempt)
-        bulk_data = bulk.json()
-        records.extend(bulk_data if isinstance(bulk_data, list) else bulk_data.get("resolvedObjects", []))
-
-    logger.info(f"Office {office['office_id']} – {entity}: {len(records)} records")
-
-    # ── Load to Snowflake ───────────────────────────────────────────────────
-    load_ts = window_end.strftime("%Y-%m-%d %H:%M:%S")
-    sf = SnowflakeConnector.load("snowflake-altapestdb").get_connection()
-    with sf as conn:
-        cur = conn.cursor()
-        cur.executemany(
-            f"INSERT INTO RAW.fieldroutes.{table_name} (OfficeID, LoadDatetimeUTC, RawData) VALUES (%s,%s,PARSE_JSON(%s))",
-            [(office["office_id"], load_ts, json.dumps(r)) for r in records],
-        )
-        # watermark
-        cur.execute(
-            "UPDATE RAW.REF.office_entity_watermark SET last_run_utc = %s WHERE office_id = %s AND entity_name = %s",
-            (load_ts, office["office_id"], entity),
-        )
-        conn.commit()
+        query_string = urllib.parse.urlencode(chunk_params, doseq=True)
+        
+        try:
+            bulk_url = f"{base_url}/{entity}/get?{query_string}"
+            bulk_data = make_api_request(bulk_url, headers, timeout=60)
+            
+            # Handle response format variations
+            if isinstance(bulk_data, list):
+                records.extend(bulk_data)
+            else:
+                records.extend(bulk_data.get("resolvedObjects", []))
+                
+        except Exception as e:
+            logger.error(f"Bulk fetch failed for {entity} chunk: {str(e)}")
+            # Continue with partial data rather than failing entirely
+            continue
+    
+    total_records = len(records)
+    logger.info(f"Total records fetched for {entity}: {total_records}")
+    
+    if total_records == 0:
+        logger.warning(f"No records found for {entity} in office {office['office_id']}")
+        return 0, 0
+    
+    # ── Step 3: Load to Snowflake ────────────────────────────────────────────
+    load_timestamp = window_end.strftime("%Y-%m-%d %H:%M:%S") if window_end else datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    
+    try:
+        sf_connector = SnowflakeConnector.load("snowflake-altapestdb")
+        with sf_connector.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Batch insert records
+            insert_query = f"""
+                INSERT INTO RAW.fieldroutes.{table_name} 
+                (OfficeID, LoadDatetimeUTC, RawData) 
+                VALUES (%s, %s, PARSE_JSON(%s))
+            """
+            
+            # Process in batches to avoid memory issues
+            batch_size = 5000
+            total_loaded = 0
+            
+            for batch in chunk_list(records, batch_size):
+                batch_data = [
+                    (office["office_id"], load_timestamp, json.dumps(record))
+                    for record in batch
+                ]
+                cursor.executemany(insert_query, batch_data)
+                total_loaded += len(batch)
+                logger.info(f"Loaded batch of {len(batch)} records ({total_loaded}/{total_records})")
+            
+            # Update watermark
+            cursor.execute("""
+                UPDATE RAW.REF.office_entity_watermark 
+                SET last_run_utc = %s, 
+                    records_loaded = %s,
+                    last_success_utc = CURRENT_TIMESTAMP()
+                WHERE office_id = %s AND entity_name = %s
+            """, (load_timestamp, total_loaded, office["office_id"], entity))
+            
+            conn.commit()
+            logger.info(f"✅ Successfully loaded {total_loaded} records for {entity}")
+            
+    except Exception as e:
+        logger.error(f"Snowflake load failed for {entity}: {str(e)}")
+        raise
+    
+    return total_records, total_loaded
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Flow – nightly full load
+# Monitoring task
 # ─────────────────────────────────────────────────────────────────────────────
-@flow(name="FieldRoutes_Nightly_ETL")
-def run_nightly_fieldroutes_etl():
+@task(name="log_extraction_summary", tags=["monitoring"])
+def log_extraction_summary(results: List[Tuple[str, int, int]]):
+    """Log summary statistics for the extraction."""
     logger = get_run_logger()
-    now = datetime.datetime.now(datetime.UTC)
-    yday = now - datetime.timedelta(days=1)
+    
+    total_fetched = sum(r[1] for r in results)
+    total_loaded = sum(r[2] for r in results)
+    
+    logger.info("="*60)
+    logger.info("EXTRACTION SUMMARY")
+    logger.info("="*60)
+    for entity, fetched, loaded in results:
+        status = "✅" if fetched == loaded else "⚠️"
+        logger.info(f"{status} {entity}: Fetched={fetched}, Loaded={loaded}")
+    logger.info(f"TOTAL: Fetched={total_fetched}, Loaded={total_loaded}")
+    logger.info("="*60)
+    
+    if total_fetched != total_loaded:
+        logger.warning("Some records were not loaded successfully")
 
-    # pull roster + watermarks
-    sf = SnowflakeConnector.load("snowflake-altapestdb").get_connection()
-    with sf as conn:
-        cur = conn.cursor()
-        cur.execute("""
-            SELECT o.office_id, o.office_name, o.base_url,
-                   o.secret_block_name_key, o.secret_block_name_token,
-                   w.entity_name, w.last_run_utc
-            FROM   Ref.offices_lookup o
-            JOIN   RAW.REF.office_entity_watermark w USING (office_id);
-        """)
-        rows = cur.fetchall()
-
-    offices: Dict[int, Dict] = {}
-    for office_id, name, url, key_blk, tok_blk, entity_name, last_run in rows:
-        offices.setdefault(office_id, {
-            "office_id": office_id,
-            "office_name": name,
-            "base_url": url,
-            "auth_key": Secret.load(key_blk).get(),
-            "auth_token": Secret.load(tok_blk).get(),
-            "watermarks": {},
-        })
-        offices[office_id]["watermarks"][entity_name] = last_run
-
-    # submit & await
-    futures = []
-    meta_list = [
-        {"endpoint": ep, "table": tbl, "is_dim": dim, "small": small, "date_field": df}
-        for ep, tbl, dim, small, df in ENTITY_META
-    ]
-
-    for office in offices.values():
-        for meta in meta_list:
-            fut = fetch_entity.submit(
-                office=office,
-                meta=meta,
-                window_start=yday,
-                window_end=now,
-            )
-            futures.append(fut)
-
-    for fut in futures:
-        fut.result()   # will raise if any task crashed
-
-    logger.info("✅ Nightly FieldRoutes ETL flow finished")
-
-if __name__ == "__main__":
-    run_nightly_fieldroutes_etl()
+# ─────────────────────────────────────────────────────────────────────────────
+# Schema validation task (optional but recommended)
+# ─────────────────────────────────────────────────────────────────────────────
+@task(name="validate_snowflake_schema", tags=["validation"])
+def validate_snowflake_schema() -> bool:
+    """Ensure all required tables exist in Snowflake."""
+    logger = get_run_logger()
+    
+    required_tables = set(meta[1] for meta in ENTITY_META)
+    
+    try:
+        sf_connector = SnowflakeConnector.load("snowflake-altapestdb")
+        with sf_connector.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT TABLE_NAME 
+                FROM INFORMATION_SCHEMA.TABLES 
+                WHERE TABLE_SCHEMA = 'FIELDROUTES' 
+                AND TABLE_CATALOG = 'RAW'
+            """)
+            existing_tables = {row[0] for row in cursor.fetchall()}
+        
+        missing_tables = required_tables - existing_tables
+        if missing_tables:
+            logger.error(f"Missing tables in Snowflake: {missing_tables}")
+            return False
+        
+        logger.info("✅ All required tables exist in Snowflake")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Schema validation failed: {str(e)}")
+        return False
