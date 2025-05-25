@@ -17,9 +17,9 @@ from prefect import flow, task, get_run_logger
 from prefect.blocks.system import Secret
 from prefect_snowflake import SnowflakeConnector
 
-# ─────────────────────────────────────────────────────────────────────────────
+# =============================================================================
 # Entity metadata configuration
-# ─────────────────────────────────────────────────────────────────────────────
+# =============================================================================
 ENTITY_META = [
     # Dimension tables (reference data)
     ("customer",       "Customer_Dim",        True,  False, "dateUpdated"),
@@ -68,9 +68,9 @@ def is_retriable_error(exception):
         return exception.response.status_code >= 500
     return isinstance(exception, (requests.ConnectionError, requests.Timeout))
 
-# ─────────────────────────────────────────────────────────────────────────────
+# =============================================================================
 # Enhanced API interaction with native Prefect retries
-# ─────────────────────────────────────────────────────────────────────────────
+# =============================================================================
 @retry(
     stop=stop_after_attempt(5),
     wait=wait_exponential(multiplier=1, min=2, max=60),
@@ -88,9 +88,9 @@ def make_api_request(url: str, headers: Dict, params: Dict = None, timeout: int 
     response.raise_for_status()
     return response.json()
 
-# ─────────────────────────────────────────────────────────────────────────────
+# =============================================================================
 # Main ETL Task
-# ─────────────────────────────────────────────────────────────────────────────
+# =============================================================================
 @task(
     name="fetch_entity",
     description="Fetch data for one entity from one office",
@@ -144,7 +144,7 @@ def fetch_entity(
         })
         logger.info(f"Using date filter: {date_field} BETWEEN {window_start} and {window_end}")
     
-    # ── Step 1: Search endpoint ──────────────────────────────────────────────
+    # == Step 1: Search endpoint ==============================================
     try:
         search_url = f"{base_url}/{entity}/search"
         search_data = make_api_request(search_url, headers, params)
@@ -158,7 +158,7 @@ def fetch_entity(
     
     logger.info(f"Search returned {len(records)} full records and {len(unresolved_ids)} IDs to fetch")
     
-    # ── Step 2: Bulk fetch unresolved IDs ────────────────────────────────────
+    # == Step 2: Bulk fetch unresolved IDs ====================================
     for id_chunk in chunk_list(unresolved_ids, 1000):
         # Build query string for bulk fetch
         chunk_params = [(f"{entity}IDs", str(id)) for id in id_chunk]
@@ -186,7 +186,7 @@ def fetch_entity(
         logger.warning(f"No records found for {entity} in office {office['office_id']}")
         return 0, 0
     
-    # ── Step 3: Load to Snowflake ────────────────────────────────────────────
+    # == Step 3: Load to Snowflake ============================================
     load_timestamp = window_end.strftime("%Y-%m-%d %H:%M:%S") if window_end else datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
     
     try:
@@ -232,9 +232,9 @@ def fetch_entity(
     
     return total_records, total_loaded
 
-# ─────────────────────────────────────────────────────────────────────────────
+# =============================================================================
 # Monitoring task
-# ─────────────────────────────────────────────────────────────────────────────
+# =============================================================================
 @task(name="log_extraction_summary", tags=["monitoring"])
 def log_extraction_summary(results: List[Tuple[str, int, int]]):
     """Log summary statistics for the extraction."""
@@ -255,9 +255,9 @@ def log_extraction_summary(results: List[Tuple[str, int, int]]):
     if total_fetched != total_loaded:
         logger.warning("Some records were not loaded successfully")
 
-# ─────────────────────────────────────────────────────────────────────────────
+# =============================================================================
 # Schema validation task (optional but recommended)
-# ─────────────────────────────────────────────────────────────────────────────
+# =============================================================================
 @task(name="validate_snowflake_schema", tags=["validation"])
 def validate_snowflake_schema() -> bool:
     """Ensure all required tables exist in Snowflake."""
