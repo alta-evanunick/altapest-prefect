@@ -113,6 +113,7 @@ def fetch_entity(
         Tuple of (records_fetched, records_loaded)
     """
     logger = get_run_logger()
+    unresolved_ids = []
     
     entity = meta["endpoint"]
     table_name = meta["table"]
