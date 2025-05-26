@@ -18,9 +18,9 @@ from prefect.blocks.system import Secret
 from prefect_snowflake import SnowflakeConnector
 import pytz
 
-# =============================================================================
+#=============================================================================
 # Entity metadata configuration
-# =============================================================================
+#=============================================================================
 ENTITY_META = [
     # Dimension tables (reference data)
     ("customer",       "Customer_Dim",        True,  False, "dateUpdated"),
@@ -69,9 +69,9 @@ def is_retriable_error(exception):
         return exception.response.status_code >= 500
     return isinstance(exception, (requests.ConnectionError, requests.Timeout))
 
-# =============================================================================
+#=============================================================================
 # Enhanced API interaction with native Prefect retries
-# =============================================================================
+#=============================================================================
 @retry(
     stop=stop_after_attempt(5),
     wait=wait_exponential(multiplier=1, min=2, max=60),

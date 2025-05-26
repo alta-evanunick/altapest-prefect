@@ -73,7 +73,7 @@ def run_nightly_fieldroutes_etl():
     
     # Process offices sequentially
     for office_idx, office in enumerate(sorted_offices, 1):
-        logger.info(f"🏢 Processing office {office_idx}/{len(sorted_offices)}: {office['office_id']} ({office['office_name']})")
+        logger.info(f"Processing office {office_idx}/{len(sorted_offices)}: {office['office_id']} ({office['office_name']})")
         
         office_success = 0
         office_failed = 0
@@ -89,38 +89,38 @@ def run_nightly_fieldroutes_etl():
                 )
                 office_success += 1
                 logger.info(
-                    f"✅ {entity_name} completed for office {office['office_id']}"
+                    f"{entity_name} completed for office {office['office_id']}"
                 )
             except Exception as exc:
                 office_failed += 1
                 logger.error(
-                    f"❌ {entity_name} failed for office {office['office_id']}: {exc}"
+                    f"{entity_name} failed for office {office['office_id']}: {exc}"
                 )
 
 
         # Log office completion summary
-        logger.info(f"🏢 Office {office['office_id']} completed: {office_success} success, {office_failed} failed")
+        logger.info(f"Office {office['office_id']} completed: {office_success} success, {office_failed} failed")
         total_success += office_success
         total_failed += office_failed
         
         # Brief pause between offices to be API-friendly
         if office_idx < len(sorted_offices):  # Don't sleep after the last office
-            logger.info("⏸️  Pausing 30 seconds before next office...")
+            logger.info("Pausing 30 seconds before next office...")
             time.sleep(30)
     
     # Final summary
     logger.info("="*60)
-    logger.info("🎯 NIGHTLY ETL SUMMARY")
+    logger.info("NIGHTLY ETL SUMMARY")
     logger.info("="*60)
     logger.info(f"Total entities processed: {total_success + total_failed}")
-    logger.info(f"✅ Successful: {total_success}")
-    logger.info(f"❌ Failed: {total_failed}")
+    logger.info(f"Successful: {total_success}")
+    logger.info(f"Failed: {total_failed}")
     
     if total_failed > 0:
-        logger.warning(f"⚠️  Nightly ETL completed with {total_failed} failures")
+        logger.warning(f"Nightly ETL completed with {total_failed} failures")
         # Don't raise exception - let partial success stand
     else:
-        logger.info("🎉 Nightly FieldRoutes ETL completed successfully")
+        logger.info("Nightly FieldRoutes ETL completed successfully")
     
 
 @flow(name="FieldRoutes_CDC_ETL")
@@ -184,7 +184,7 @@ def run_cdc_fieldroutes_etl():
     
     # Process offices sequentially
     for office_idx, office in enumerate(sorted_offices, 1):
-        logger.info(f"🏢 CDC processing office {office_idx}/{len(sorted_offices)}: {office['office_id']} ({office['office_name']})")
+        logger.info(f"CDC processing office {office_idx}/{len(sorted_offices)}: {office['office_id']} ({office['office_name']})")
         
         office_success = 0
         office_failed = 0
@@ -209,37 +209,37 @@ def run_cdc_fieldroutes_etl():
                 )
                 office_success += 1
                 logger.info(
-                    f"✅ CDC {entity_name} completed for office {office['office_id']}"
+                    f"CDC {entity_name} completed for office {office['office_id']}"
                 )
             except Exception as exc:
                 office_failed += 1
                 logger.error(
-                    f"❌ CDC {entity_name} failed for office {office['office_id']}: {exc}"
+                    f"CDC {entity_name} failed for office {office['office_id']}: {exc}"
                 )
         
         # Log office completion summary
-        logger.info(f"🏢 Office {office['office_id']} CDC completed: {office_success} success, {office_failed} failed")
+        logger.info(f"Office {office['office_id']} CDC completed: {office_success} success, {office_failed} failed")
         total_success += office_success
         total_failed += office_failed
         
         # Brief pause between offices
         if office_idx < len(sorted_offices):
-            logger.info("⏸️  Pausing 15 seconds before next office...")
+            logger.info("Pausing 15 seconds before next office...")
             time.sleep(15)
     
     # Final summary
     logger.info("="*60)
-    logger.info("🎯 CDC ETL SUMMARY")
+    logger.info("CDC ETL SUMMARY")
     logger.info("="*60)
     logger.info(f"Total CDC entities processed: {total_success + total_failed}")
-    logger.info(f"✅ Successful: {total_success}")
-    logger.info(f"❌ Failed: {total_failed}")
+    logger.info(f"Successful: {total_success}")
+    logger.info(f"Failed: {total_failed}")
     
     if total_failed > 0:
-        logger.warning(f"⚠️  CDC ETL completed with {total_failed} failures")
+        logger.warning(f"CDC ETL completed with {total_failed} failures")
         # Don't raise exception - let partial success stand
     else:
-        logger.info("🎉 CDC FieldRoutes ETL completed successfully")
+        logger.info("CDC FieldRoutes ETL completed successfully")
 
 if __name__ == "__main__":
     # For local testing
