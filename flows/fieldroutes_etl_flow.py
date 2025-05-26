@@ -178,7 +178,7 @@ def fetch_entity(
             })
             # Note: PestRoutes API might not support IS NULL filters easily
             # So we'll get all records created in the time window and filter client-side
-            
+            unresolved_ids = []
             try:
                 logger.info(f"Search 2: Records created between {start_date} and {end_date}")
                 search_data_created = make_api_request(search_url, headers, params_created)
