@@ -113,6 +113,7 @@ def fetch_entity(
         Tuple of (records_fetched, records_loaded)
     """
     logger = get_run_logger()
+    records = []
     unresolved_ids = []
     
     entity = meta["endpoint"]
@@ -153,7 +154,6 @@ def fetch_entity(
             # Strategy: Make two separate searches and combine results
             records_updated = []
             records_created = []
-            records = []
             
             # Search 1: Records updated in time window
             params_updated = params.copy()
