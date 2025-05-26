@@ -64,7 +64,7 @@ def run_cdc_fieldroutes_etl():
     # Process each office/entity pair sequentially
     failed_count = 0
     for office in offices:
-        logger.info(f"Processing office {office['office_id']} ({office['office_name']})")
+        logger.info(f"🏢 Processing office {office['office_id']} ({office['office_name']})")
         for meta in cdc_entities:
             try:
                 fetch_entity(
@@ -74,18 +74,13 @@ def run_cdc_fieldroutes_etl():
                     window_end=window_end,
                 )
                 logger.info(
-                    f"CDC {meta['endpoint']} completed for office {office['office_id']}"
+                    f"✅ CDC {meta['endpoint']} completed for office {office['office_id']}"
                 )
             except Exception as exc:
                 logger.error(
-                    f"CDC {meta['endpoint']} failed for office {office['office_id']}: {exc}"
+                    f"❌ CDC {meta['endpoint']} failed for office {office['office_id']}: {exc}"
                 )
                 failed_count += 1
-    
-    if failed_count > 0:
-        logger.warning(f"CDC flow completed with {failed_count} failures")
-    else:
-        logger.info("CDC FieldRoutes ETL flow completed successfully")
 
 if __name__ == "__main__":
     run_cdc_fieldroutes_etl()

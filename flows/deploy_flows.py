@@ -14,10 +14,8 @@ CDC_ENTITIES = [
 
 @flow(name="FieldRoutes_Nightly_ETL", task_runner=SequentialTaskRunner())
 def run_nightly_fieldroutes_etl():
-    """
-    Prefect flow to perform a full nightly extract for all offices and entities.
-    Processes offices sequentially to avoid overwhelming the FieldRoutes API.
-    """
+    """Prefect flow to perform a full nightly extract for all offices and entities.
+    Processes offices sequentially to avoid overwhelming the FieldRoutes API."""
     logger = get_run_logger()
     now = datetime.datetime.now(datetime.UTC)
     window_end = now
@@ -57,6 +55,7 @@ def run_nightly_fieldroutes_etl():
     
     logger.info(f"Starting nightly FieldRoutes ETL for {len(sorted_offices)} offices")
     logger.info(f"Offices to process: {[f'{o['office_id']} ({o['office_name']})' for o in sorted_offices]}")
+
     
     # Prepare entity metadata
     meta_dict = {
@@ -69,13 +68,13 @@ def run_nightly_fieldroutes_etl():
         }
         for meta in ENTITY_META
     }
-    
+
     total_success = 0
     total_failed = 0
     
     # Process offices sequentially
     for office_idx, office in enumerate(sorted_offices, 1):
-        logger.info(f" Processing office {office_idx}/{len(sorted_offices)}: {office['office_id']} ({office['office_name']})")
+        logger.info(f"🏢 Processing office {office_idx}/{len(sorted_offices)}: {office['office_id']} ({office['office_name']})")
         
         office_success = 0
         office_failed = 0
@@ -91,44 +90,44 @@ def run_nightly_fieldroutes_etl():
                 )
                 office_success += 1
                 logger.info(
-                    f" {entity_name} completed for office {office['office_id']}"
+                    f"✅ {entity_name} completed for office {office['office_id']}"
                 )
             except Exception as exc:
                 office_failed += 1
                 logger.error(
-                    f" {entity_name} failed for office {office['office_id']}: {exc}"
+                    f"❌ {entity_name} failed for office {office['office_id']}: {exc}"
                 )
-        
+
+
         # Log office completion summary
-        logger.info(f" Office {office['office_id']} completed: {office_success} success, {office_failed} failed")
+        logger.info(f"🏢 Office {office['office_id']} completed: {office_success} success, {office_failed} failed")
         total_success += office_success
         total_failed += office_failed
         
         # Brief pause between offices to be API-friendly
         if office_idx < len(sorted_offices):  # Don't sleep after the last office
-            logger.info("⏸  Pausing 30 seconds before next office...")
+            logger.info("⏸️  Pausing 30 seconds before next office...")
             time.sleep(30)
     
     # Final summary
     logger.info("="*60)
-    logger.info(" NIGHTLY ETL SUMMARY")
+    logger.info("🎯 NIGHTLY ETL SUMMARY")
     logger.info("="*60)
     logger.info(f"Total entities processed: {total_success + total_failed}")
-    logger.info(f" Successful: {total_success}")
-    logger.info(f" Failed: {total_failed}")
+    logger.info(f"✅ Successful: {total_success}")
+    logger.info(f"❌ Failed: {total_failed}")
     
     if total_failed > 0:
-        logger.warning(f"Nightly ETL completed with {total_failed} failures")
+        logger.warning(f"⚠️  Nightly ETL completed with {total_failed} failures")
         # Don't raise exception - let partial success stand
     else:
-        logger.info("Nightly FieldRoutes ETL completed successfully")
+        logger.info("🎉 Nightly FieldRoutes ETL completed successfully")
+    
 
 @flow(name="FieldRoutes_CDC_ETL", task_runner=SequentialTaskRunner())
 def run_cdc_fieldroutes_etl():
-    """
-    CDC flow for high-velocity tables using watermarks.
-    Processes offices sequentially to avoid overwhelming the FieldRoutes API.
-    """
+    """CDC flow for high-velocity tables using watermarks.
+    Processes offices sequentially to avoid overwhelming the FieldRoutes API."""
     logger = get_run_logger()
     
     # Get offices and their CDC watermarks
@@ -143,7 +142,7 @@ def run_cdc_fieldroutes_etl():
             JOIN   RAW.REF.office_entity_watermark w USING (office_id)
             WHERE  o.active = TRUE
               AND  w.entity_name IN ({})
-            ORDER BY o.office_id;
+            ORDER BY o.office_id
         """.format(','.join(f"'{e}'" for e in CDC_ENTITIES)))
         rows = cur.fetchall()
     
@@ -160,10 +159,10 @@ def run_cdc_fieldroutes_etl():
             "watermarks": {}
         })
         offices[office_id]["watermarks"][entity_name] = last_run
-    
+
     # Sort offices by ID
     sorted_offices = sorted(offices.values(), key=lambda x: x["office_id"])
-    
+        
     # Prepare CDC entity metadata
     meta_dict = {
         meta[0]: {
@@ -177,6 +176,7 @@ def run_cdc_fieldroutes_etl():
     }
     
     now = datetime.datetime.now(datetime.UTC)
+    
     logger.info(f"Starting CDC FieldRoutes ETL for {len(sorted_offices)} offices")
     logger.info(f"CDC entities: {list(meta_dict.keys())}")
     
@@ -185,11 +185,11 @@ def run_cdc_fieldroutes_etl():
     
     # Process offices sequentially
     for office_idx, office in enumerate(sorted_offices, 1):
-        logger.info(f"CDC processing office {office_idx}/{len(sorted_offices)}: {office['office_id']} ({office['office_name']})")
+        logger.info(f"🏢 CDC processing office {office_idx}/{len(sorted_offices)}: {office['office_id']} ({office['office_name']})")
         
         office_success = 0
         office_failed = 0
-
+        
         # Process CDC tasks sequentially with proper windows based on watermarks
         for entity_name, meta in meta_dict.items():
             # Use watermark as start time, with 15-minute overlap for safety
@@ -199,6 +199,7 @@ def run_cdc_fieldroutes_etl():
             else:
                 # First run - get last 2 hours
                 window_start = now - datetime.timedelta(hours=2)
+            
 
             try:
                 fetch_entity(
@@ -209,37 +210,37 @@ def run_cdc_fieldroutes_etl():
                 )
                 office_success += 1
                 logger.info(
-                    f" CDC {entity_name} completed for office {office['office_id']}"
+                    f"✅ CDC {entity_name} completed for office {office['office_id']}"
                 )
             except Exception as exc:
                 office_failed += 1
                 logger.error(
-                    f" CDC {entity_name} failed for office {office['office_id']}: {exc}"
+                    f"❌ CDC {entity_name} failed for office {office['office_id']}: {exc}"
                 )
         
         # Log office completion summary
-        logger.info(f"Office {office['office_id']} CDC completed: {office_success} success, {office_failed} failed")
+        logger.info(f"🏢 Office {office['office_id']} CDC completed: {office_success} success, {office_failed} failed")
         total_success += office_success
         total_failed += office_failed
         
         # Brief pause between offices
         if office_idx < len(sorted_offices):
-            logger.info("⏸Pausing 15 seconds before next office...")
+            logger.info("⏸️  Pausing 15 seconds before next office...")
             time.sleep(15)
     
     # Final summary
     logger.info("="*60)
-    logger.info("CDC ETL SUMMARY")
+    logger.info("🎯 CDC ETL SUMMARY")
     logger.info("="*60)
     logger.info(f"Total CDC entities processed: {total_success + total_failed}")
-    logger.info(f" Successful: {total_success}")
-    logger.info(f" Failed: {total_failed}")
+    logger.info(f"✅ Successful: {total_success}")
+    logger.info(f"❌ Failed: {total_failed}")
     
     if total_failed > 0:
-        logger.warning(f"CDC ETL completed with {total_failed} failures")
+        logger.warning(f"⚠️  CDC ETL completed with {total_failed} failures")
         # Don't raise exception - let partial success stand
     else:
-        logger.info("CDC FieldRoutes ETL completed successfully")
+        logger.info("🎉 CDC FieldRoutes ETL completed successfully")
 
 if __name__ == "__main__":
     # For local testing
