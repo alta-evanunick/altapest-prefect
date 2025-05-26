@@ -3,7 +3,6 @@ import time
 from typing import Dict, List
 from prefect import flow, task, get_run_logger
 from prefect_snowflake import SnowflakeConnector
-from prefect.task_runners import ConcurrentTaskRunner, SequentialTaskRunner
 from flows.fieldroutes_etl_flow import fetch_entity, ENTITY_META
 
 # Define high-velocity entities for CDC
@@ -12,7 +11,7 @@ CDC_ENTITIES = [
     "appliedPayment", "route", "subscription"
 ]
 
-@flow(name="FieldRoutes_Nightly_ETL", task_runner=SequentialTaskRunner())
+@flow(name="FieldRoutes_Nightly_ETL")
 def run_nightly_fieldroutes_etl():
     """Prefect flow to perform a full nightly extract for all offices and entities.
     Processes offices sequentially to avoid overwhelming the FieldRoutes API."""
@@ -124,7 +123,7 @@ def run_nightly_fieldroutes_etl():
         logger.info("🎉 Nightly FieldRoutes ETL completed successfully")
     
 
-@flow(name="FieldRoutes_CDC_ETL", task_runner=SequentialTaskRunner())
+@flow(name="FieldRoutes_CDC_ETL")
 def run_cdc_fieldroutes_etl():
     """CDC flow for high-velocity tables using watermarks.
     Processes offices sequentially to avoid overwhelming the FieldRoutes API."""
