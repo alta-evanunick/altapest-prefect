@@ -153,6 +153,7 @@ def fetch_entity(
             # Strategy: Make two separate searches and combine results
             records_updated = []
             records_created = []
+            records = []
             
             # Search 1: Records updated in time window
             params_updated = params.copy()
