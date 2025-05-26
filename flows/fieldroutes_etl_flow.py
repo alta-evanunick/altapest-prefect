@@ -99,7 +99,7 @@ def make_api_request(url: str, headers: Dict, params: Dict = None, timeout: int 
     retry_delay_seconds=60,
     tags=["api", "extract"]
 )
-def fetch_entity_with_dual_dates(
+def fetch_entity(
     office: Dict, 
     meta: Dict, 
     window_start: Optional[datetime.datetime] = None, 
