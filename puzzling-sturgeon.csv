@@ -1,0 +1,212 @@
+timestamp,level,flow_run_id,task_run_id,message
+2025-05-26 02:33:18.258197+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,,Opening process...
+2025-05-26 02:33:20.070486+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,, > Running git_clone step...
+2025-05-26 02:33:20.711348+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,, > Running run_shell_script step...
+2025-05-26 02:33:46.289068+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,,Beginning flow run 'puzzling-sturgeon' for flow 'FieldRoutes_Nightly_ETL'
+2025-05-26 02:33:48.295718+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,,Started a new connection to Snowflake.
+2025-05-26 02:35:42.415595+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,,Starting nightly FieldRoutes ETL for 17 offices
+2025-05-26 02:35:42.416607+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,,"Offices to process: ['1 (Seattle)', '3 (Spokane)', '4 (OKC)', '5 (Tulsa)', '6 (Wichita)', '7 (Austin)', '8 (DC)', '9 (Dallas)', '10 (Las Vegas)', '12 (Nashville)', '13 (Virginia Beach)', '14 (Kansas City)', '15 (Charlotte)', '16 (San Antonio)', '17 (Knoxville)', '18 (Fort Worth)', '19 (Tricities)']"
+2025-05-26 02:35:42.418575+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,,🏢 Processing office 1/17: 1 (Seattle)
+2025-05-26 02:35:42.625241+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a72-2606-7c57-8ffc-006663e9c2e0,Starting fetch for customer - Office 1 (Seattle)
+2025-05-26 02:35:42.665057+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a72-2606-7c57-8ffc-006663e9c2e0,Search failed for customer: Server error: 500
+2025-05-26 02:35:42.667271+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a72-2606-7c57-8ffc-006663e9c2e0,Task run failed with exception: FieldRoutesAPIError('Server error: 500') - Retry 1/2 will start 60 second(s) from now
+2025-05-26 02:36:42.732334+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a72-2606-7c57-8ffc-006663e9c2e0,Starting fetch for customer - Office 1 (Seattle)
+2025-05-26 02:36:42.770584+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a72-2606-7c57-8ffc-006663e9c2e0,Search failed for customer: Server error: 500
+2025-05-26 02:36:42.772549+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a72-2606-7c57-8ffc-006663e9c2e0,Task run failed with exception: FieldRoutesAPIError('Server error: 500') - Retry 2/2 will start 60 second(s) from now
+2025-05-26 02:37:42.837627+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a72-2606-7c57-8ffc-006663e9c2e0,Starting fetch for customer - Office 1 (Seattle)
+2025-05-26 02:37:42.882392+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a72-2606-7c57-8ffc-006663e9c2e0,Search failed for customer: Server error: 500
+2025-05-26 02:37:42.883222+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a72-2606-7c57-8ffc-006663e9c2e0,"Task run failed with exception: FieldRoutesAPIError('Server error: 500') - Retries are exhausted
+Traceback (most recent call last):
+  File ""/usr/local/lib/python3.12/site-packages/prefect/task_engine.py"", line 825, in run_context
+    yield self
+  File ""/usr/local/lib/python3.12/site-packages/prefect/task_engine.py"", line 1421, in run_task_sync
+    engine.call_task_fn(txn)
+  File ""/usr/local/lib/python3.12/site-packages/prefect/task_engine.py"", line 842, in call_task_fn
+    result = call_with_parameters(self.task.fn, parameters)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/prefect/utilities/callables.py"", line 210, in call_with_parameters
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File ""/opt/prefect/altapest-prefect-main/flows/fieldroutes_etl_flow.py"", line 150, in fetch_entity
+    search_data = make_api_request(search_url, headers, params)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 338, in wrapped_f
+    return copy(f, *args, **kw)
+           ^^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 477, in __call__
+    do = self.iter(retry_state=retry_state)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 378, in iter
+    result = action(retry_state)
+             ^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 400, in <lambda>
+    self._add_action_func(lambda rs: rs.outcome.result())
+                                     ^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/concurrent/futures/_base.py"", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/concurrent/futures/_base.py"", line 401, in __get_result
+    raise self._exception
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 480, in __call__
+    result = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+  File ""/opt/prefect/altapest-prefect-main/flows/fieldroutes_etl_flow.py"", line 86, in make_api_request
+    raise FieldRoutesAPIError(f""Server error: {response.status_code}"")
+flows.fieldroutes_etl_flow.FieldRoutesAPIError: Server error: 500"
+2025-05-26 02:37:42.989120+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a72-2606-7c57-8ffc-006663e9c2e0,Finished in state Failed('Task run encountered an exception FieldRoutesAPIError: Server error: 500')
+2025-05-26 02:37:42.989870+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,,❌ customer failed for office 1: Server error: 500
+2025-05-26 02:37:43.095336+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a73-fcee-7d0f-b364-e4818f496502,Starting fetch for employee - Office 1 (Seattle)
+2025-05-26 02:37:43.134956+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a73-fcee-7d0f-b364-e4818f496502,Search failed for employee: Server error: 500
+2025-05-26 02:37:43.136220+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a73-fcee-7d0f-b364-e4818f496502,Task run failed with exception: FieldRoutesAPIError('Server error: 500') - Retry 1/2 will start 60 second(s) from now
+2025-05-26 02:38:43.151711+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a73-fcee-7d0f-b364-e4818f496502,Starting fetch for employee - Office 1 (Seattle)
+2025-05-26 02:38:43.201633+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a73-fcee-7d0f-b364-e4818f496502,Search failed for employee: Server error: 500
+2025-05-26 02:38:43.203140+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a73-fcee-7d0f-b364-e4818f496502,Task run failed with exception: FieldRoutesAPIError('Server error: 500') - Retry 2/2 will start 60 second(s) from now
+2025-05-26 02:39:43.241990+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a73-fcee-7d0f-b364-e4818f496502,Starting fetch for employee - Office 1 (Seattle)
+2025-05-26 02:39:43.281413+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a73-fcee-7d0f-b364-e4818f496502,Search failed for employee: Server error: 500
+2025-05-26 02:39:43.282474+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a73-fcee-7d0f-b364-e4818f496502,"Task run failed with exception: FieldRoutesAPIError('Server error: 500') - Retries are exhausted
+Traceback (most recent call last):
+  File ""/usr/local/lib/python3.12/site-packages/prefect/task_engine.py"", line 825, in run_context
+    yield self
+  File ""/usr/local/lib/python3.12/site-packages/prefect/task_engine.py"", line 1421, in run_task_sync
+    engine.call_task_fn(txn)
+  File ""/usr/local/lib/python3.12/site-packages/prefect/task_engine.py"", line 842, in call_task_fn
+    result = call_with_parameters(self.task.fn, parameters)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/prefect/utilities/callables.py"", line 210, in call_with_parameters
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File ""/opt/prefect/altapest-prefect-main/flows/fieldroutes_etl_flow.py"", line 150, in fetch_entity
+    search_data = make_api_request(search_url, headers, params)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 338, in wrapped_f
+    return copy(f, *args, **kw)
+           ^^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 477, in __call__
+    do = self.iter(retry_state=retry_state)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 378, in iter
+    result = action(retry_state)
+             ^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 400, in <lambda>
+    self._add_action_func(lambda rs: rs.outcome.result())
+                                     ^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/concurrent/futures/_base.py"", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/concurrent/futures/_base.py"", line 401, in __get_result
+    raise self._exception
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 480, in __call__
+    result = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+  File ""/opt/prefect/altapest-prefect-main/flows/fieldroutes_etl_flow.py"", line 86, in make_api_request
+    raise FieldRoutesAPIError(f""Server error: {response.status_code}"")
+flows.fieldroutes_etl_flow.FieldRoutesAPIError: Server error: 500"
+2025-05-26 02:39:43.418172+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a73-fcee-7d0f-b364-e4818f496502,Finished in state Failed('Task run encountered an exception FieldRoutesAPIError: Server error: 500')
+2025-05-26 02:39:43.419190+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,,❌ employee failed for office 1: Server error: 500
+2025-05-26 02:39:43.528377+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a75-d35d-7c4e-8868-18ae5614464e,Starting fetch for office - Office 1 (Seattle)
+2025-05-26 02:39:43.569380+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a75-d35d-7c4e-8868-18ae5614464e,Search failed for office: Server error: 500
+2025-05-26 02:39:43.571210+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a75-d35d-7c4e-8868-18ae5614464e,Task run failed with exception: FieldRoutesAPIError('Server error: 500') - Retry 1/2 will start 60 second(s) from now
+2025-05-26 02:40:43.635573+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a75-d35d-7c4e-8868-18ae5614464e,Starting fetch for office - Office 1 (Seattle)
+2025-05-26 02:40:43.674233+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a75-d35d-7c4e-8868-18ae5614464e,Search failed for office: Server error: 500
+2025-05-26 02:40:43.675729+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a75-d35d-7c4e-8868-18ae5614464e,Task run failed with exception: FieldRoutesAPIError('Server error: 500') - Retry 2/2 will start 60 second(s) from now
+2025-05-26 02:41:43.712076+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a75-d35d-7c4e-8868-18ae5614464e,Starting fetch for office - Office 1 (Seattle)
+2025-05-26 02:41:43.749789+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a75-d35d-7c4e-8868-18ae5614464e,Search failed for office: Server error: 500
+2025-05-26 02:41:43.750713+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a75-d35d-7c4e-8868-18ae5614464e,"Task run failed with exception: FieldRoutesAPIError('Server error: 500') - Retries are exhausted
+Traceback (most recent call last):
+  File ""/usr/local/lib/python3.12/site-packages/prefect/task_engine.py"", line 825, in run_context
+    yield self
+  File ""/usr/local/lib/python3.12/site-packages/prefect/task_engine.py"", line 1421, in run_task_sync
+    engine.call_task_fn(txn)
+  File ""/usr/local/lib/python3.12/site-packages/prefect/task_engine.py"", line 842, in call_task_fn
+    result = call_with_parameters(self.task.fn, parameters)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/prefect/utilities/callables.py"", line 210, in call_with_parameters
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File ""/opt/prefect/altapest-prefect-main/flows/fieldroutes_etl_flow.py"", line 150, in fetch_entity
+    search_data = make_api_request(search_url, headers, params)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 338, in wrapped_f
+    return copy(f, *args, **kw)
+           ^^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 477, in __call__
+    do = self.iter(retry_state=retry_state)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 378, in iter
+    result = action(retry_state)
+             ^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 400, in <lambda>
+    self._add_action_func(lambda rs: rs.outcome.result())
+                                     ^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/concurrent/futures/_base.py"", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/concurrent/futures/_base.py"", line 401, in __get_result
+    raise self._exception
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 480, in __call__
+    result = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+  File ""/opt/prefect/altapest-prefect-main/flows/fieldroutes_etl_flow.py"", line 86, in make_api_request
+    raise FieldRoutesAPIError(f""Server error: {response.status_code}"")
+flows.fieldroutes_etl_flow.FieldRoutesAPIError: Server error: 500"
+2025-05-26 02:41:43.850200+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a75-d35d-7c4e-8868-18ae5614464e,Finished in state Failed('Task run encountered an exception FieldRoutesAPIError: Server error: 500')
+2025-05-26 02:41:43.851122+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,,❌ office failed for office 1: Server error: 500
+2025-05-26 02:41:43.968297+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a77-a9cd-7e54-aaa8-2280ffd75b3a,Starting fetch for region - Office 1 (Seattle)
+2025-05-26 02:41:44.013184+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a77-a9cd-7e54-aaa8-2280ffd75b3a,Search failed for region: Server error: 500
+2025-05-26 02:41:44.014871+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a77-a9cd-7e54-aaa8-2280ffd75b3a,Task run failed with exception: FieldRoutesAPIError('Server error: 500') - Retry 1/2 will start 60 second(s) from now
+2025-05-26 02:42:44.080302+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a77-a9cd-7e54-aaa8-2280ffd75b3a,Starting fetch for region - Office 1 (Seattle)
+2025-05-26 02:42:44.120313+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a77-a9cd-7e54-aaa8-2280ffd75b3a,Search failed for region: Server error: 500
+2025-05-26 02:42:44.122133+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a77-a9cd-7e54-aaa8-2280ffd75b3a,Task run failed with exception: FieldRoutesAPIError('Server error: 500') - Retry 2/2 will start 60 second(s) from now
+2025-05-26 02:43:44.188720+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a77-a9cd-7e54-aaa8-2280ffd75b3a,Starting fetch for region - Office 1 (Seattle)
+2025-05-26 02:43:44.226248+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a77-a9cd-7e54-aaa8-2280ffd75b3a,Search failed for region: Server error: 500
+2025-05-26 02:43:44.227548+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a77-a9cd-7e54-aaa8-2280ffd75b3a,"Task run failed with exception: FieldRoutesAPIError('Server error: 500') - Retries are exhausted
+Traceback (most recent call last):
+  File ""/usr/local/lib/python3.12/site-packages/prefect/task_engine.py"", line 825, in run_context
+    yield self
+  File ""/usr/local/lib/python3.12/site-packages/prefect/task_engine.py"", line 1421, in run_task_sync
+    engine.call_task_fn(txn)
+  File ""/usr/local/lib/python3.12/site-packages/prefect/task_engine.py"", line 842, in call_task_fn
+    result = call_with_parameters(self.task.fn, parameters)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/prefect/utilities/callables.py"", line 210, in call_with_parameters
+    return fn(*args, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^
+  File ""/opt/prefect/altapest-prefect-main/flows/fieldroutes_etl_flow.py"", line 150, in fetch_entity
+    search_data = make_api_request(search_url, headers, params)
+                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 338, in wrapped_f
+    return copy(f, *args, **kw)
+           ^^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 477, in __call__
+    do = self.iter(retry_state=retry_state)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 378, in iter
+    result = action(retry_state)
+             ^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 400, in <lambda>
+    self._add_action_func(lambda rs: rs.outcome.result())
+                                     ^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/concurrent/futures/_base.py"", line 449, in result
+    return self.__get_result()
+           ^^^^^^^^^^^^^^^^^^^
+  File ""/usr/local/lib/python3.12/concurrent/futures/_base.py"", line 401, in __get_result
+    raise self._exception
+  File ""/usr/local/lib/python3.12/site-packages/tenacity/__init__.py"", line 480, in __call__
+    result = fn(*args, **kwargs)
+             ^^^^^^^^^^^^^^^^^^^
+  File ""/opt/prefect/altapest-prefect-main/flows/fieldroutes_etl_flow.py"", line 86, in make_api_request
+    raise FieldRoutesAPIError(f""Server error: {response.status_code}"")
+flows.fieldroutes_etl_flow.FieldRoutesAPIError: Server error: 500"
+2025-05-26 02:43:44.339687+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a77-a9cd-7e54-aaa8-2280ffd75b3a,Finished in state Failed('Task run encountered an exception FieldRoutesAPIError: Server error: 500')
+2025-05-26 02:43:44.340667+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,,❌ region failed for office 1: Server error: 500
+2025-05-26 02:43:44.449698+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a79-8077-7b08-8ba5-1b6ea30a6942,Starting fetch for serviceType - Office 1 (Seattle)
+2025-05-26 02:43:44.488147+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a79-8077-7b08-8ba5-1b6ea30a6942,Search failed for serviceType: Server error: 500
+2025-05-26 02:43:44.489727+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a79-8077-7b08-8ba5-1b6ea30a6942,Task run failed with exception: FieldRoutesAPIError('Server error: 500') - Retry 1/2 will start 60 second(s) from now
+2025-05-26 02:44:44.556635+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a79-8077-7b08-8ba5-1b6ea30a6942,Starting fetch for serviceType - Office 1 (Seattle)
+2025-05-26 02:44:44.604891+00:00,40,06833d2d-50c4-7077-8000-ebb1690327d9,01970a79-8077-7b08-8ba5-1b6ea30a6942,Search failed for serviceType: Server error: 500
+2025-05-26 02:44:44.606580+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,01970a79-8077-7b08-8ba5-1b6ea30a6942,Task run failed with exception: FieldRoutesAPIError('Server error: 500') - Retry 2/2 will start 60 second(s) from now
+2025-05-26 02:45:18.304558+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,,"Process for flow run 'puzzling-sturgeon' exited with status code: -15; This indicates that the process exited due to a SIGTERM signal. Typically, this is caused by manual cancellation."
+2025-05-26 02:45:21.198556+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,,Loading flow to check for on_cancellation hooks
+2025-05-26 02:45:21.341625+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,, > Running git_clone step...
+2025-05-26 02:45:21.912451+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,, > Running run_shell_script step...
+2025-05-26 02:45:26.555495+00:00,20,06833d2d-50c4-7077-8000-ebb1690327d9,,Cancelled flow run 'puzzling-sturgeon'!
