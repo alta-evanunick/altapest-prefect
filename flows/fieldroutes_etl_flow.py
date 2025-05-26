@@ -168,7 +168,7 @@ def make_api_request(
 # Main ETL Task
 # =============================================================================
 @task(retries=2, retry_delay_seconds=60)
-def fetch_entity_optimized(
+def fetch_entity(
     office: Dict,
     entity_config: EntityConfig,
     window_start: Optional[datetime.datetime] = None,
