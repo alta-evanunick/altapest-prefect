@@ -1,4 +1,5 @@
 from __future__ import annotations
+import pytz
 """
 FieldRoutes → Snowflake ETL with enhanced Prefect patterns
 • Uses Prefect's native retry mechanisms
@@ -98,13 +99,14 @@ def make_api_request(url: str, headers: Dict, params: Dict = None, timeout: int 
     retry_delay_seconds=60,
     tags=["api", "extract"]
 )
-def fetch_entity(
+def fetch_entity_with_dual_dates(
     office: Dict, 
     meta: Dict, 
     window_start: Optional[datetime.datetime] = None, 
     window_end: Optional[datetime.datetime] = None
 ) -> Tuple[int, int]:
-    """
+    """Enhanced fetch with timezone fix and dual date field support
+
     Fetch entity data from FieldRoutes API and load to Snowflake.
     
     Returns:
@@ -135,28 +137,89 @@ def fetch_entity(
     
     # Add date filter for incremental loads (fact tables only)
     if window_start and not is_dimension:
-        params[date_field] = json.dumps({
-            "operator": "BETWEEN",
-            "value": [
-                window_start.strftime("%Y-%m-%d"),
-                window_end.strftime("%Y-%m-%d")
-            ]
-        })
-        logger.info(f"Using date filter: {date_field} BETWEEN {window_start} and {window_end}")
-    
-    # == Step 1: Search endpoint ==============================================
-    try:
-        search_url = f"{base_url}/{entity}/search"
-        search_data = make_api_request(search_url, headers, params)
-    except Exception as e:
-        logger.error(f"Search failed for {entity}: {str(e)}")
-        raise
-    
-    # Extract records and unresolved IDs
-    records = search_data.get("resolvedObjects", []) or search_data.get("ResolvedObjects", [])
-    unresolved_ids = search_data.get(f"{entity}IDsNoDataExported", [])
-    
-    logger.info(f"Search returned {len(records)} full records and {len(unresolved_ids)} IDs to fetch")
+        # Convert UTC to Pacific Time
+        pacific_tz = pytz.timezone('America/Los_Angeles')
+        pt_start = window_start.astimezone(pacific_tz)
+        pt_end = window_end.astimezone(pacific_tz)
+        
+        start_date = pt_start.strftime("%Y-%m-%d")
+        end_date = pt_end.strftime("%Y-%m-%d")
+        
+        # Handle dual date field logic for dateUpdated entities
+        if date_field == "dateUpdated":
+            logger.info(f"Using dual date strategy for {entity}: searching both dateUpdated and dateAdded")
+            
+            # Strategy: Make two separate searches and combine results
+            records_updated = []
+            records_created = []
+            
+            # Search 1: Records updated in time window
+            params_updated = params.copy()
+            params_updated["dateUpdated"] = json.dumps({
+                "operator": "BETWEEN",
+                "value": [start_date, end_date]
+            })
+            
+            try:
+                search_url = f"{base_url}/{entity}/search"
+                logger.info(f"Search 1: Records updated between {start_date} and {end_date}")
+                search_data_updated = make_api_request(search_url, headers, params_updated)
+                records_updated = search_data_updated.get("resolvedObjects", []) or search_data_updated.get("ResolvedObjects", [])
+                unresolved_updated = search_data_updated.get(f"{entity}IDsNoDataExported", [])
+                logger.info(f"Found {len(records_updated)} updated records, {len(unresolved_updated)} IDs to fetch")
+            except Exception as e:
+                logger.warning(f"Updated records search failed: {e}")
+            
+            # Search 2: Records created in time window with no updates (dateUpdated IS NULL)
+            params_created = params.copy() 
+            params_created["dateAdded"] = json.dumps({
+                "operator": "BETWEEN",
+                "value": [start_date, end_date]
+            })
+            # Note: PestRoutes API might not support IS NULL filters easily
+            # So we'll get all records created in the time window and filter client-side
+            
+            try:
+                logger.info(f"Search 2: Records created between {start_date} and {end_date}")
+                search_data_created = make_api_request(search_url, headers, params_created)
+                all_created = search_data_created.get("resolvedObjects", []) or search_data_created.get("ResolvedObjects", [])
+                # Filter to only records where dateUpdated is null or empty
+                records_created = [r for r in all_created if not r.get("dateUpdated")]
+                unresolved_created = search_data_created.get(f"{entity}IDsNoDataExported", [])
+                logger.info(f"Found {len(all_created)} created records, {len(records_created)} with null dateUpdated")
+            except Exception as e:
+                logger.warning(f"Created records search failed: {e}")
+            
+            # Combine results and remove duplicates (by ID)
+            all_records = records_updated + records_created
+            all_unresolved = list(set(unresolved_updated + unresolved_created))  # Remove duplicate IDs
+            
+            # Remove duplicate records (in case a record appears in both searches)
+            seen_ids = set()
+            unique_records = []
+            for record in all_records:
+                record_id = record.get(f"{entity}ID") or record.get("id")
+                if record_id not in seen_ids:
+                    seen_ids.add(record_id)
+                    unique_records.append(record)
+            
+            records = unique_records
+            unresolved_ids = all_unresolved
+            
+        else:
+            # Simple single date field search (for dateAdded entities)
+            params[date_field] = json.dumps({
+                "operator": "BETWEEN", 
+                "value": [start_date, end_date]
+            })
+            
+            search_url = f"{base_url}/{entity}/search"
+            search_data = make_api_request(search_url, headers, params)
+            records = search_data.get("resolvedObjects", []) or search_data.get("ResolvedObjects", [])
+            unresolved_ids = search_data.get(f"{entity}IDsNoDataExported", [])
+        
+        logger.info(f"Total unique records after dual date search: {len(records)}")
+        logger.info(f"Unresolved IDs to bulk fetch: {len(unresolved_ids)}")
     
     # == Step 2: Bulk fetch unresolved IDs ====================================
     for id_chunk in chunk_list(unresolved_ids, 1000):
