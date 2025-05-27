@@ -122,6 +122,11 @@ def fetch_entity(
     pacific_tz = pytz.timezone('America/Los_Angeles')
     pt_start = None
     pt_end = None
+
+    if window_start and window_end:
+        pt_start = window_start.astimezone(pacific_tz)
+        pt_end = window_end.astimezone(pacific_tz)
+    
     # Add date filter for incremental loads (fact tables only)
     if window_start and not is_dimension:
         # Convert to Pacific Time
