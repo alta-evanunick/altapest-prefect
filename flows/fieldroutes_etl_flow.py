@@ -1,3 +1,9 @@
+from __future__ import annotations
+"""
+FieldRoutes → Snowflake ETL - FINAL WORKING VERSION
+All fixes applied including the GET URL format
+"""
+
 import json
 import time
 import datetime
@@ -74,7 +80,7 @@ def make_api_request(url: str, headers: Dict, params: Dict = None, timeout: int 
     raise RuntimeError(f"Failed after {max_retries} attempts")
 
 # =============================================================================
-# Main ETL Task - CORRECTED VERSION
+# Main ETL Task - FINAL VERSION WITH ALL FIXES
 # =============================================================================
 @task(
     name="fetch_entity",
@@ -100,7 +106,6 @@ def fetch_entity(
     entity = meta["endpoint"]
     table_name = meta["table"]
     date_field = meta["date_field"]
-    is_small_dim = meta["small"]
     is_dimension = meta["is_dim"]
     
     logger.info(f"Starting fetch for {entity} - Office {office['office_id']} ({office['office_name']})")
@@ -122,17 +127,14 @@ def fetch_entity(
     pacific_tz = pytz.timezone('America/Los_Angeles')
     pt_start = None
     pt_end = None
-
+    
+    # Convert dates if provided - do this ALWAYS when we have dates
     if window_start and window_end:
         pt_start = window_start.astimezone(pacific_tz)
         pt_end = window_end.astimezone(pacific_tz)
     
     # Add date filter for incremental loads (fact tables only)
-    if window_start and not is_dimension:
-        # Convert to Pacific Time
-        pt_start = window_start.astimezone(pacific_tz)
-        pt_end = window_end.astimezone(pacific_tz)
-        
+    if window_start and window_end and not is_dimension:
         # FieldRoutes expects date-only format
         date_filter = {
             "operator": "BETWEEN",
@@ -178,8 +180,8 @@ def fetch_entity(
                     logger.info(f"Found {len(all_ids)} IDs in {field}")
                     break
         
-        # For dateUpdated entities, also search by dateAdded
-        if date_field == "dateUpdated" and window_start:
+        # For dateUpdated entities, also search by dateAdded (only if we have date windows)
+        if date_field == "dateUpdated" and pt_start and pt_end:
             logger.info(f"Performing additional search on dateAdded for {entity}")
             
             params_created = params.copy()
@@ -220,12 +222,15 @@ def fetch_entity(
     all_records = []
     
     for id_chunk in chunk_list(all_ids, 1000):
-        # Build query string for batch get
-        chunk_params = [(f"{entity}IDs", str(id)) for id in id_chunk]
-        query_string = urllib.parse.urlencode(chunk_params, doseq=True)
+        # Build query string for batch get - FieldRoutes expects bracketed array format
+        # Format: customerIDs=[id1,id2,id3,...]
+        ids_array = "[" + ",".join(str(id) for id in id_chunk) + "]"
+        params = {f"{entity}IDs": ids_array}
+        query_string = urllib.parse.urlencode(params)
         
         get_url = f"{base_url}/{entity}/get?{query_string}"
         logger.info(f"Fetching chunk of {len(id_chunk)} records")
+        logger.debug(f"GET URL (first 200 chars): {get_url[:200]}...")
         
         try:
             get_data = make_api_request(get_url, headers, timeout=60)
@@ -338,3 +343,38 @@ def fetch_entity(
         raise
     
     return total_records, total_loaded
+
+
+# =============================================================================
+# Schema validation task (optional but recommended)
+# =============================================================================
+@task(name="validate_snowflake_schema", tags=["validation"])
+def validate_snowflake_schema() -> bool:
+    """Ensure all required tables exist in Snowflake."""
+    logger = get_run_logger()
+    
+    required_tables = set(meta[1] for meta in ENTITY_META)
+    
+    try:
+        sf_connector = SnowflakeConnector.load("snowflake-altapestdb")
+        with sf_connector.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT TABLE_NAME 
+                FROM INFORMATION_SCHEMA.TABLES 
+                WHERE TABLE_SCHEMA = 'FIELDROUTES' 
+                AND TABLE_CATALOG = 'RAW'
+            """)
+            existing_tables = {row[0] for row in cursor.fetchall()}
+        
+        missing_tables = required_tables - existing_tables
+        if missing_tables:
+            logger.error(f"Missing tables in Snowflake: {missing_tables}")
+            return False
+        
+        logger.info("All required tables exist in Snowflake")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Schema validation failed: {str(e)}")
+        return False
