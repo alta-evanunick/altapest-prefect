@@ -260,4 +260,4 @@ def run_cdc_fieldroutes_etl():
 
 if __name__ == "__main__":
     # For local testing
-    run_nightly_fieldroutes_etl()
+    run_nightly_fieldroutes_etl(test_office_id=1,test_entity="customer")
