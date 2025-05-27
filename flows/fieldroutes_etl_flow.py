@@ -302,7 +302,7 @@ def fetch_entity(
     load_timestamp = window_end.strftime("%Y-%m-%d %H:%M:%S") if window_end else datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
 
     try:
-        from prefect_azure.blob_storage import AzureBlobStorageContainer
+        from prefect_azure.blob_storage import AzureBlobStorageContainer, blob_storage_upload
         import csv
         import io
         import uuid
@@ -335,14 +335,16 @@ def fetch_entity(
         csv_content = csv_buffer.getvalue().encode('utf-8')
         csv_buffer.close()
         
-        # Upload to blob using Prefect's method
-        blob_path = azure_container.upload_from_bytes(
+        # Upload to blob using Prefect's function
+        blob_storage_upload(
             data=csv_content,
+            container=azure_container.container_name,  # Get container name from the block
             blob=blob_name,
+            blob_storage_credentials=azure_container.credentials,  # Get credentials from the block
             overwrite=True
         )
         
-        logger.info(f"Successfully uploaded {len(all_records)} records to Azure Blob Storage at {blob_path}")
+        logger.info(f"Successfully uploaded {len(all_records)} records to Azure Blob Storage")
         
         # Update watermark in Snowflake (just the watermark, not the data)
         sf_connector = SnowflakeConnector.load("snowflake-altapestdb")
