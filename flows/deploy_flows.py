@@ -12,13 +12,22 @@ CDC_ENTITIES = [
 ]
 
 @flow(name="FieldRoutes_Nightly_ETL")
-def run_nightly_fieldroutes_etl():
+def run_nightly_fieldroutes_etl(
+    test_office_id: Optional[int] = None,
+    test_entity: Optional[str] = None
+):
     """Prefect flow to perform a full nightly extract for all offices and entities.
+    
+    Args:
+        test_office_id: Optional office ID to test with.
+        test_entity: Optional entity to test with.
+    
     Processes offices sequentially to avoid overwhelming the FieldRoutes API."""
+
     logger = get_run_logger()
     now = datetime.datetime.now(datetime.UTC)
     window_end = now
-    window_start = now - datetime.timedelta(days=1)
+    window_start = now - datetime.timedelta(hours=1)
     
     # Retrieve offices and watermarks
     sf_block = SnowflakeConnector.load("snowflake-altapestdb")
@@ -48,7 +57,10 @@ def run_nightly_fieldroutes_etl():
             "watermarks": {}
         })
         offices[office_id]["watermarks"][entity_name] = last_run
-    
+    if test_office_id:
+        sorted_offices = [o for o in sorted_offices if o['office_id'] == test_office_id]
+        logger.info(f"TEST MODE: Only processing office {test_office_id}")
+
     # Sort offices by ID for predictable processing order
     sorted_offices = sorted(offices.values(), key=lambda x: x["office_id"])
     
@@ -57,16 +69,20 @@ def run_nightly_fieldroutes_etl():
 
     
     # Prepare entity metadata
-    meta_dict = {
-        meta[0]: {
-            "endpoint": meta[0],
-            "table": meta[1],
-            "is_dim": meta[2],
-            "small": meta[3],
-            "date_field": meta[4]
+    if test_entity:
+        meta_dict = {k: v for k, v in meta_dict.items() if k == test_entity}
+        logger.info(f"TEST MODE: Only processing entity {test_entity}")
+    else:
+        meta_dict = {
+            meta[0]: {
+                "endpoint": meta[0],
+                "table": meta[1],
+                "is_dim": meta[2],
+                "small": meta[3],
+                "date_field": meta[4]
+            }
+            for meta in ENTITY_META
         }
-        for meta in ENTITY_META
-    }
 
     total_success = 0
     total_failed = 0
@@ -121,6 +137,7 @@ def run_nightly_fieldroutes_etl():
         # Don't raise exception - let partial success stand
     else:
         logger.info("Nightly FieldRoutes ETL completed successfully")
+    
     
 
 @flow(name="FieldRoutes_CDC_ETL")
