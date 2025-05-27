@@ -311,19 +311,44 @@ def fetch_entity(
                 SELECT %s, %s, PARSE_JSON(%s)
             """
             
-            # Process in batches to avoid memory issues
-            batch_size = 5000
+            # Batch insert using Snowflake's multi-row VALUES syntax
+            batch_size = 1000  # Smaller batches for safety
             total_loaded = 0
-            
+
             for batch in chunk_list(all_records, batch_size):
-                batch_data = [
-                    (office["office_id"], load_timestamp, json.dumps(record))
-                    for record in batch
-                ]
-                cursor.executemany(insert_query, batch_data)
-                total_loaded += len(batch)
-                logger.info(f"Loaded batch of {len(batch)} records ({total_loaded}/{total_records})")
-            
+                # Build multi-row insert manually
+                values_list = []
+                for record in batch:
+                    json_str = json.dumps(record).replace("'", "''")  # Escape single quotes
+                    values_list.append(f"({office['office_id']}, '{load_timestamp}', PARSE_JSON('{json_str}'))")
+                
+                # Join all values
+                values_str = ",\n".join(values_list)
+                
+                insert_query = f"""
+                    INSERT INTO RAW.fieldroutes.{table_name} 
+                    (OfficeID, LoadDatetimeUTC, RawData) 
+                    VALUES {values_str}
+                """
+                
+                try:
+                    cursor.execute(insert_query)
+                    total_loaded += len(batch)
+                    logger.info(f"Loaded batch of {len(batch)} records ({total_loaded}/{total_records})")
+                except Exception as e:
+                    logger.error(f"Batch insert failed: {str(e)}")
+                    # Fall back to individual inserts for this batch
+                    for record in batch:
+                        try:
+                            json_str = json.dumps(record)
+                            cursor.execute(f"""
+                                INSERT INTO RAW.fieldroutes.{table_name} 
+                                SELECT {office['office_id']}, '{load_timestamp}', PARSE_JSON(%s)
+                            """, (json_str,))
+                            total_loaded += 1
+                        except:
+                            continue            
+
             # Update watermark
             cursor.execute("""
                 UPDATE RAW.REF.office_entity_watermark 
