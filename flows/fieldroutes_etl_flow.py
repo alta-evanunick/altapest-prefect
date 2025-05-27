@@ -308,7 +308,7 @@ def fetch_entity(
             insert_query = f"""
                 INSERT INTO RAW.fieldroutes.{table_name} 
                 (OfficeID, LoadDatetimeUTC, RawData) 
-                VALUES (%s, %s, %s)
+                SELECT %s, %s, PARSE_JSON(%s)
             """
             
             # Process in batches to avoid memory issues
