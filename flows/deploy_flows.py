@@ -1,6 +1,6 @@
 import datetime
 import time
-from typing import Dict
+from typing import Dict, Optional
 from prefect import flow, get_run_logger
 from prefect_snowflake import SnowflakeConnector
 from flows.fieldroutes_etl_flow import fetch_entity, ENTITY_META
