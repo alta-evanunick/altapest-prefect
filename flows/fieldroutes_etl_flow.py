@@ -120,11 +120,10 @@ def fetch_entity(
     
     # Convert UTC to Pacific Time for date filtering
     pacific_tz = pytz.timezone('America/Los_Angeles')
-    
+    pt_start = None
+    pt_end = None
     # Add date filter for incremental loads (fact tables only)
     if window_start and not is_dimension:
-        pt_start = []
-        pt_end = []
         # Convert to Pacific Time
         pt_start = window_start.astimezone(pacific_tz)
         pt_end = window_end.astimezone(pacific_tz)
