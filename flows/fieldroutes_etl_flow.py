@@ -308,7 +308,7 @@ def fetch_entity(
         import uuid
         
         # Load your Azure block
-        azure_container = AzureBlobStorageContainer.load("octanedataprod-azure")
+        azure_container = AzureBlobStorageContainer.load("azure-octanedataprod")
         container_name = "raw"
         
         # Generate unique blob name
