@@ -19,7 +19,7 @@ deployments:
       - prefect.deployments.steps.run_shell_script:
           id: install_requirements
           script: |
-            pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity pytz azure-storage-blob
+            pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity pytz prefect-azure azure-storage-blob
             python -c "from prefect_snowflake import SnowflakeConnector; import pytz; print('Snowflake connector and pytz available')"
   
   - name: fieldroutes-cdc
