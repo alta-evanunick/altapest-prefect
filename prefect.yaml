@@ -19,7 +19,7 @@ deployments:
       - prefect.deployments.steps.run_shell_script:
           id: install_requirements
           script: |
-            pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity pytz
+            pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity pytz azure-storage-blob
             python -c "from prefect_snowflake import SnowflakeConnector; import pytz; print('Snowflake connector and pytz available')"
   
   - name: fieldroutes-cdc
@@ -41,8 +41,8 @@ deployments:
       - prefect.deployments.steps.run_shell_script:
           id: install_requirements
           script: |
-            pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity
-            python -c "import prefect, prefect_snowflake, snowflake.connector, requests, pandas, pyarrow, tenacity; print('All dependencies loaded')"
+            pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity azure-storage-blob prefect-azure
+            python -c "import prefect, prefect_snowflake, snowflake.connector, requests, pandas, pyarrow, tenacity, azure.storage.blob, prefect_azure; print('All dependencies loaded')"
 
   - name: fieldroutes-dev
     flow_name: FieldRoutes_Nightly_ETL
@@ -60,4 +60,5 @@ deployments:
           credentials: "{{ prefect.blocks.github-credentials.github-evanunick }}"
       - prefect.deployments.steps.run_shell_script:
           script: |
-            pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity
+            pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow tenacity azure-storage-blob prefect-azure
+            python -c "import prefect, prefect_snowflake, snowflake.connector, requests, pandas, pyarrow, tenacity, azure.storage.blob, prefect_azure; print('All dependencies loaded')"

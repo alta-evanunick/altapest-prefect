@@ -3,16 +3,18 @@ from __future__ import annotations
 FieldRoutes → Snowflake ETL - FINAL WORKING VERSION
 All fixes applied including the GET URL format
 """
-
+from azure.storage.blob import BlobServiceClient
+import uuid
 import json
 import time
 import datetime
-import urllib.parse
 from typing import Dict, List, Optional, Tuple
 import requests
 import pytz
 from prefect import flow, task, get_run_logger
 from prefect.blocks.system import Secret
+from prefect_azure import AzureBlobStorageContainer
+from prefect_azure.blob_storage import blob_storage_upload
 from prefect_snowflake import SnowflakeConnector
 
 # =============================================================================
@@ -296,76 +298,70 @@ def fetch_entity(
         logger.warning(f"No records retrieved for {entity} despite having {len(all_ids)} IDs")
         return len(all_ids), 0
     
-    # == Step 3: Load to Snowflake ============================================
+    # == Step 3: Write to Azure Blob Storage as CSV ===============================
     load_timestamp = window_end.strftime("%Y-%m-%d %H:%M:%S") if window_end else datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
-    
+
     try:
+        from prefect_azure.blob_storage import AzureBlobStorageContainer
+        import csv
+        import io
+        import uuid
+        
+        # Load your Azure block
+        azure_container = AzureBlobStorageContainer.load("octanedataprod-azure")
+        
+        # Generate unique blob name
+        timestamp_str = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
+        blob_name = f"fieldroutes/{entity}/office_{office['office_id']}/{timestamp_str}_{uuid.uuid4().hex[:8]}.csv"
+        
+        logger.info(f"Writing {len(all_records)} records to blob: {blob_name}")
+        
+        # Create CSV content
+        csv_buffer = io.StringIO()
+        csv_writer = csv.writer(csv_buffer, delimiter='|', quoting=csv.QUOTE_MINIMAL, escapechar='\\')
+        
+        # Write header
+        csv_writer.writerow(['OfficeID', 'LoadDatetimeUTC', 'RawData'])
+        
+        # Write data rows
+        for record in all_records:
+            csv_writer.writerow([
+                office["office_id"],
+                load_timestamp,
+                json.dumps(record)  # JSON as a string in the CSV
+            ])
+        
+        # Get CSV content as bytes
+        csv_content = csv_buffer.getvalue().encode('utf-8')
+        csv_buffer.close()
+        
+        # Upload to blob using Prefect's method
+        blob_path = azure_container.upload_from_bytes(
+            data=csv_content,
+            blob=blob_name,
+            overwrite=True
+        )
+        
+        logger.info(f"Successfully uploaded {len(all_records)} records to Azure Blob Storage at {blob_path}")
+        
+        # Update watermark in Snowflake (just the watermark, not the data)
         sf_connector = SnowflakeConnector.load("snowflake-altapestdb")
         with sf_connector.get_connection() as conn:
             cursor = conn.cursor()
-            
-            # Batch insert records
-            insert_query = f"""
-                INSERT INTO RAW.fieldroutes.{table_name} 
-                (OfficeID, LoadDatetimeUTC, RawData) 
-                SELECT %s, %s, PARSE_JSON(%s)
-            """
-            
-            # Batch insert using Snowflake's multi-row VALUES syntax
-            batch_size = 1000  # Smaller batches for safety
-            total_loaded = 0
-
-            for batch in chunk_list(all_records, batch_size):
-                # Build multi-row insert manually
-                values_list = []
-                for record in batch:
-                    json_str = json.dumps(record).replace("'", "''")  # Escape single quotes
-                    values_list.append(f"({office['office_id']}, '{load_timestamp}', PARSE_JSON('{json_str}'))")
-                
-                # Join all values
-                values_str = ",\n".join(values_list)
-                
-                insert_query = f"""
-                    INSERT INTO RAW.fieldroutes.{table_name} 
-                    (OfficeID, LoadDatetimeUTC, RawData) 
-                    VALUES {values_str}
-                """
-                
-                try:
-                    cursor.execute(insert_query)
-                    total_loaded += len(batch)
-                    logger.info(f"Loaded batch of {len(batch)} records ({total_loaded}/{total_records})")
-                except Exception as e:
-                    logger.error(f"Batch insert failed: {str(e)}")
-                    # Fall back to individual inserts for this batch
-                    for record in batch:
-                        try:
-                            json_str = json.dumps(record)
-                            cursor.execute(f"""
-                                INSERT INTO RAW.fieldroutes.{table_name} 
-                                SELECT {office['office_id']}, '{load_timestamp}', PARSE_JSON(%s)
-                            """, (json_str,))
-                            total_loaded += 1
-                        except:
-                            continue            
-
-            # Update watermark
             cursor.execute("""
                 UPDATE RAW.REF.office_entity_watermark 
                 SET last_run_utc = %s, 
                     records_loaded = %s,
                     last_success_utc = CURRENT_TIMESTAMP()
                 WHERE office_id = %s AND entity_name = %s
-            """, (load_timestamp, total_loaded, office["office_id"], entity))
-            
+            """, (load_timestamp, len(all_records), office["office_id"], entity))
             conn.commit()
-            logger.info(f"Successfully loaded {total_loaded} records for {entity}")
+        
+        return len(all_records), len(all_records)
 
     except Exception as e:
-        logger.error(f"Snowflake load failed for {entity}: {str(e)}")
+        logger.error(f"Azure Blob Storage upload failed for {entity}: {str(e)}")
         raise
-    
-    return total_records, total_loaded
 
 
 # =============================================================================
