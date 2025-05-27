@@ -309,10 +309,11 @@ def fetch_entity(
         
         # Load your Azure block
         azure_container = AzureBlobStorageContainer.load("octanedataprod-azure")
+        container_name = "raw"
         
         # Generate unique blob name
         timestamp_str = datetime.datetime.now(datetime.UTC).strftime("%Y%m%d_%H%M%S")
-        blob_name = f"fieldroutes/{entity}/office_{office['office_id']}/{timestamp_str}_{uuid.uuid4().hex[:8]}.csv"
+        blob_name = f"fieldroutes/{entity}/office_{office['office_id']}_{timestamp_str}_{uuid.uuid4().hex[:8]}.csv"
         
         logger.info(f"Writing {len(all_records)} records to blob: {blob_name}")
         
@@ -338,9 +339,9 @@ def fetch_entity(
         # Upload to blob using Prefect's function
         blob_storage_upload(
             data=csv_content,
-            container=azure_container.container_name,  # Get container name from the block
+            container=container_name,
             blob=blob_name,
-            blob_storage_credentials=azure_container.credentials,  # Get credentials from the block
+            blob_storage_credentials=azure_container.credentials,
             overwrite=True
         )
         
