@@ -224,11 +224,9 @@ def fetch_entity(
     for id_chunk in chunk_list(all_ids, 1000):
         # Build query string for batch get - FieldRoutes expects bracketed array format
         # Format: customerIDs=[id1,id2,id3,...]
-        ids_array = "[" + ",".join(str(id) for id in id_chunk) + "]"
-        params = {f"{entity}IDs": ids_array}
-        query_string = urllib.parse.urlencode(params)
-        
-        get_url = f"{base_url}/{entity}/get?{query_string}"
+        id_list = ",".join(str(id) for id in id_chunk)
+        # params = {f"{entity}IDs": id_list}
+        get_url = f"{base_url}/{entity}/get?{entity}IDs=[{id_list}]"
         logger.info(f"Fetching chunk of {len(id_chunk)} records")
         logger.debug(f"GET URL (first 200 chars): {get_url[:200]}...")
         
