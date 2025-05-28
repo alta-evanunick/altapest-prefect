@@ -138,8 +138,9 @@ def fetch_entity(
         pt_start = window_start.astimezone(pacific_tz)
         pt_end = window_end.astimezone(pacific_tz)
     
-    # Add date filter for incremental loads (fact tables only)
-    if window_start and window_end and not is_dimension:
+    # Add date filter for incremental loads
+    # Note: For customer dimension, we want to apply date filter to catch updates
+    if window_start and window_end and (not is_dimension or entity == "customer"):
         date_filter = {
             "operator": "BETWEEN",
             "value": [
@@ -229,9 +230,23 @@ def fetch_entity(
             logger.info(f"Page {page_count}: Found {len(page_ids)} IDs (total so far: {len(all_ids)})")
             
             # Check if we hit the 50K limit and need to paginate
-            if len(page_ids) == 50000:
-                last_id = max(page_ids)
-                logger.warning(f"Hit 50K limit on page {page_count}, will fetch next page")
+            if len(page_ids) >= 50000:
+                # CRITICAL FIX: Ensure we're actually making progress
+                if page_ids:
+                    new_last_id = max(page_ids)
+                    if last_id is not None and new_last_id <= last_id:
+                        logger.error(f"Pagination not progressing! last_id={last_id}, new_last_id={new_last_id}")
+                        break
+                    last_id = new_last_id
+                    logger.warning(f"Hit 50K limit on page {page_count}, will fetch next page starting after ID {last_id}")
+                else:
+                    logger.error("Got 50K limit but no IDs to paginate from")
+                    break
+                
+                # Safety check: prevent infinite loops
+                if page_count > 100:
+                    logger.error(f"Stopping pagination after {page_count} pages to prevent infinite loop")
+                    break
                 continue
             else:
                 # Less than 50K means we got all records
@@ -244,13 +259,31 @@ def fetch_entity(
             else:
                 break  # Stop pagination on error but keep what we have
         
-    # For dateUpdated entities, also search by dateAdded (only if we have date windows)
-    if date_field == "dateUpdated" and pt_start and pt_end and len(all_ids) > 0:
-        logger.info(f"Performing additional search on dateAdded for {entity}")
+    # For certain entities, also search by their secondary date field
+    # Define which entities need secondary date searches and what field to use
+    secondary_date_fields = {
+        "customer": "dateAdded",
+        "employee": "dateAdded", 
+        "appointment": "dateAdded",
+        "subscription": "dateAdded",
+        "route": "date",  # Special case for routes
+        "ticket": "dateCreated",  # Special case for tickets
+        "ticketItem": "dateAdded",
+        "payment": "dateAdded",
+        "appliedPayment": "dateAdded",
+        "disbursement": "dateCreated",
+        "chargeback": "dateCreated"
+    }
+    
+    secondary_field = secondary_date_fields.get(entity)
+    if secondary_field and pt_start and pt_end:
+        logger.info(f"Performing additional search on {secondary_field} for {entity}")
         
         params_created = params.copy()
-        params_created.pop("dateUpdated", None)
-        params_created["dateAdded"] = json.dumps({
+        # Remove the primary date field
+        params_created.pop(date_field, None)
+        # Add the secondary date field
+        params_created[secondary_field] = json.dumps({
             "operator": "BETWEEN",
             "value": [
                 pt_start.strftime("%Y-%m-%d"),
@@ -277,7 +310,9 @@ def fetch_entity(
                     "ticket": "ticketID",
                     "ticketItem": "ticketItemID",
                     "payment": "paymentID",
-                    "appliedPayment": "appliedPaymentID"
+                    "appliedPayment": "appliedPaymentID",
+                    "disbursement": "disbursementID",
+                    "chargeback": "chargebackID"
                 }.get(entity, f"{entity}ID")
                 
                 current_params[pk_field] = json.dumps({
@@ -298,9 +333,21 @@ def fetch_entity(
                     
                 created_ids.extend(page_ids)
                 
-                if len(page_ids) == 50000:
-                    last_id = max(page_ids)
-                    logger.warning(f"Hit 50K limit on dateAdded search page {page_count}")
+                if len(page_ids) >= 50000:
+                    # Same pagination fix as above
+                    if page_ids:
+                        new_last_id = max(page_ids)
+                        if last_id is not None and new_last_id <= last_id:
+                            logger.error(f"Secondary search pagination not progressing!")
+                            break
+                        last_id = new_last_id
+                        logger.warning(f"Hit 50K limit on {secondary_field} search page {page_count}")
+                    else:
+                        break
+                    
+                    if page_count > 100:
+                        logger.error(f"Stopping secondary pagination after {page_count} pages")
+                        break
                     continue
                 else:
                     break
