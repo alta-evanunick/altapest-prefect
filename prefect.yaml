@@ -1,12 +1,12 @@
 deployments:
-  - name: fieldroutes-nightly
-    flow_name: FieldRoutes_Nightly_ETL
-    entrypoint: flows/deploy_flows.py:run_nightly_fieldroutes_etl
+  - name: fieldroutes-nightly-snowflake-direct
+    flow_name: FieldRoutes_Nightly_ETL_Snowflake
+    entrypoint: flows/deploy_flows_snowflake.py:run_nightly_fieldroutes_etl
     schedule:
-      cron: "0 6 * * *"            
-      timezone: "America/Denver"
-    description: "Nightly full extract of all FieldRoutes entities for all offices."
-    tags: ["fieldroutes", "nightly", "full-extract"]
+      cron: "0 3 * * *"            
+      timezone: "America/Los_Angeles"
+    description: "Nightly ETL from FieldRoutes API directly to Snowflake (bypassing Azure)"
+    tags: ["fieldroutes", "nightly", "snowflake", "direct"]
     work_pool:
       name: default-work-pool
     parameters: {} 
@@ -19,17 +19,17 @@ deployments:
       - prefect.deployments.steps.run_shell_script:
           id: install_requirements
           script: |
-            pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow<19.0.0 tenacity pytz prefect-azure azure-storage-blob
+            pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow pytz orjson tenacity
             python -c "from prefect_snowflake import SnowflakeConnector; import pytz; print('Snowflake connector and pytz available')"
   
-  - name: fieldroutes-cdc
-    flow_name: FieldRoutes_CDC_ETL
-    entrypoint: flows/deploy_flows.py:run_cdc_fieldroutes_etl
+  - name: fieldroutes-cdc-snowflake-direct
+    flow_name: FieldRoutes_CDC_ETL_Snowflake
+    entrypoint: flows/deploy_flows_snowflake.py:run_cdc_fieldroutes_etl
     schedule:
-      cron: "0 8-17/2 * * 1-5"
-      timezone: "America/Denver"
-    description: "2-hour interval CDC for high-velocity FieldRoutes tables during business hours."
-    tags: ["fieldroutes", "cdc", "incremental"]
+      cron: "0 8-18/2 * * 1-5"
+      timezone: "America/Los_Angeles"
+    description: "CDC ETL for high-velocity entities from FieldRoutes API directly to Snowflake"
+    tags: ["fieldroutes", "cdc", "snowflake", "direct"]
     work_pool:
       name: default-work-pool
     parameters: {}
@@ -41,24 +41,50 @@ deployments:
       - prefect.deployments.steps.run_shell_script:
           id: install_requirements
           script: |
-            pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow<19.0.0 tenacity azure-storage-blob prefect-azure
-            python -c "import prefect, prefect_snowflake, snowflake.connector, requests, pandas, pyarrow<19.0.0, tenacity, azure.storage.blob, prefect_azure; print('All dependencies loaded')"
+            pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow pytz orjson tenacity
+            python -c "import prefect, prefect_snowflake, snowflake.connector, requests, pandas, pyarrow, tenacity; print('All dependencies loaded')"
 
-  - name: fieldroutes-dev
+  # ============================================================================
+  # LEGACY DEPLOYMENTS (Azure-based) - KEPT FOR BACKWARD COMPATIBILITY
+  # These are replaced by the Snowflake-direct deployments above
+  # ============================================================================
+  
+  - name: fieldroutes-nightly
     flow_name: FieldRoutes_Nightly_ETL
     entrypoint: flows/deploy_flows.py:run_nightly_fieldroutes_etl
-    description: "Development deployment for testing - no schedule"
-    tags: ["fieldroutes", "development", "test"]
+    schedule:
+      cron: "0 6 * * *"            
+      timezone: "America/Denver"
+    description: "[LEGACY - Use fieldroutes-nightly-snowflake-direct] Nightly full extract via Azure"
+    tags: ["fieldroutes", "nightly", "legacy", "azure"]
     work_pool:
       name: default-work-pool
-    parameters:
-      test_mode: true
+    parameters: {} 
     pull:
       - prefect.deployments.steps.git_clone:
           repository: https://github.com/alta-evanunick/altapest-prefect.git
-          branch: develop  
+          branch: main
+          credentials: "{{ prefect.blocks.github-credentials.github-evanunick }}"
+      - prefect.deployments.steps.run_shell_script:
+          script: |
+            pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow<19.0.0 tenacity pytz prefect-azure azure-storage-blob
+            
+  - name: fieldroutes-cdc
+    flow_name: FieldRoutes_CDC_ETL
+    entrypoint: flows/deploy_flows.py:run_cdc_fieldroutes_etl
+    schedule:
+      cron: "0 8-17/2 * * 1-5"
+      timezone: "America/Denver"
+    description: "[LEGACY - Use fieldroutes-cdc-snowflake-direct] 2-hour CDC via Azure"
+    tags: ["fieldroutes", "cdc", "legacy", "azure"]
+    work_pool:
+      name: default-work-pool
+    parameters: {}
+    pull:
+      - prefect.deployments.steps.git_clone:
+          repository: https://github.com/alta-evanunick/altapest-prefect.git
+          branch: main
           credentials: "{{ prefect.blocks.github-credentials.github-evanunick }}"
       - prefect.deployments.steps.run_shell_script:
           script: |
             pip install prefect prefect-snowflake snowflake-connector-python snowflake-sqlalchemy requests pandas pyarrow<19.0.0 tenacity azure-storage-blob prefect-azure
-            python -c "import prefect, prefect_snowflake, snowflake.connector, requests, pandas, pyarrow<19.0.0, tenacity, azure.storage.blob, prefect_azure; print('All dependencies loaded')"
