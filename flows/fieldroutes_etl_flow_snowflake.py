@@ -446,20 +446,28 @@ def fetch_entity(
                 
                 if entity in ["disbursement", "chargeback"]:
                     # Special handling for financial transactions
-                    for row in batch:
-                        cursor.execute(f"""
-                            INSERT INTO RAW.fieldroutes.{table_name} 
-                            (OfficeID, LoadDatetimeUTC, RawData, TransactionType)
-                            VALUES (%s, %s, PARSE_JSON(%s), %s)
-                        """, (row["office_id"], row["load_timestamp"], row["raw_data"], row["transaction_type"]))
+                    # Prepare batch data as tuples for executemany
+                    batch_tuples = [
+                        (row["office_id"], row["load_timestamp"], row["raw_data"], row["transaction_type"])
+                        for row in batch
+                    ]
+                    cursor.executemany(f"""
+                        INSERT INTO RAW.fieldroutes.{table_name} 
+                        (OfficeID, LoadDatetimeUTC, RawData, TransactionType)
+                        VALUES (%s, %s, PARSE_JSON(%s), %s)
+                    """, batch_tuples)
                 else:
-                    # Standard entities
-                    for row in batch:
-                        cursor.execute(f"""
-                            INSERT INTO RAW.fieldroutes.{table_name} 
-                            (OfficeID, LoadDatetimeUTC, RawData)
-                            VALUES (%s, %s, PARSE_JSON(%s))
-                        """, (row["office_id"], row["load_timestamp"], row["raw_data"]))
+                    # Standard entities  
+                    # Prepare batch data as tuples for executemany
+                    batch_tuples = [
+                        (row["office_id"], row["load_timestamp"], row["raw_data"])
+                        for row in batch
+                    ]
+                    cursor.executemany(f"""
+                        INSERT INTO RAW.fieldroutes.{table_name} 
+                        (OfficeID, LoadDatetimeUTC, RawData)
+                        VALUES (%s, %s, PARSE_JSON(%s))
+                    """, batch_tuples)
                 
                 inserted_count += len(batch)
                 logger.info(f"Inserted batch {i//batch_size + 1}: {inserted_count}/{len(data_rows)} records")
