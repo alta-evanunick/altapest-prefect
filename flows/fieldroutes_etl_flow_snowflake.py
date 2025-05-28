@@ -437,21 +437,32 @@ def fetch_entity(
             # Bulk insert new data
             logger.info(f"Inserting {len(data_rows)} records into {table_name}")
             
-            if entity in ["disbursement", "chargeback"]:
-                # Special handling for financial transactions
-                # Use PARSE_JSON to convert JSON string to VARIANT
-                cursor.executemany(f"""
-                    INSERT INTO RAW.fieldroutes.{table_name} 
-                    (OfficeID, LoadDatetimeUTC, RawData, TransactionType)
-                    SELECT %(office_id)s, %(load_timestamp)s, PARSE_JSON(%(raw_data)s), %(transaction_type)s
-                """, data_rows)
-            else:
-                # Use PARSE_JSON to convert JSON string to VARIANT
-                cursor.executemany(f"""
-                    INSERT INTO RAW.fieldroutes.{table_name} 
-                    (OfficeID, LoadDatetimeUTC, RawData)
-                    SELECT %(office_id)s, %(load_timestamp)s, PARSE_JSON(%(raw_data)s)
-                """, data_rows)
+            # Insert records in batches to avoid multi-row insert issues
+            batch_size = 1000
+            inserted_count = 0
+            
+            for i in range(0, len(data_rows), batch_size):
+                batch = data_rows[i:i + batch_size]
+                
+                if entity in ["disbursement", "chargeback"]:
+                    # Special handling for financial transactions
+                    for row in batch:
+                        cursor.execute(f"""
+                            INSERT INTO RAW.fieldroutes.{table_name} 
+                            (OfficeID, LoadDatetimeUTC, RawData, TransactionType)
+                            VALUES (%s, %s, PARSE_JSON(%s), %s)
+                        """, (row["office_id"], row["load_timestamp"], row["raw_data"], row["transaction_type"]))
+                else:
+                    # Standard entities
+                    for row in batch:
+                        cursor.execute(f"""
+                            INSERT INTO RAW.fieldroutes.{table_name} 
+                            (OfficeID, LoadDatetimeUTC, RawData)
+                            VALUES (%s, %s, PARSE_JSON(%s))
+                        """, (row["office_id"], row["load_timestamp"], row["raw_data"]))
+                
+                inserted_count += len(batch)
+                logger.info(f"Inserted batch {i//batch_size + 1}: {inserted_count}/{len(data_rows)} records")
             
             # Update watermark
             cursor.execute("""
