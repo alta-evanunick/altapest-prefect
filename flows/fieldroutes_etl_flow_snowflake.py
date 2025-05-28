@@ -434,54 +434,82 @@ def fetch_entity(
             # Bulk insert new data
             logger.info(f"Inserting {len(data_rows)} records into {table_name}")
             
-            # Insert records in batches using TO_VARIANT for JSON conversion
-            batch_size = 1000
-            inserted_count = 0
-            
-            for i in range(0, len(data_rows), batch_size):
-                batch = data_rows[i:i + batch_size]
+            # Use Snowflake's ability to handle JSON objects directly
+            # Insert all records at once using array binding
+            if entity in ["disbursement", "chargeback"]:
+                # For financial transactions
+                office_ids = [row[0] for row in data_rows]
+                timestamps = [row[1] for row in data_rows]
+                json_data = [row[2] for row in data_rows]
+                trans_types = [row[3] for row in data_rows]
                 
-                try:
-                    if entity in ["disbursement", "chargeback"]:
-                        # Special handling for financial transactions
-                        cursor.executemany(f"""
-                            INSERT INTO RAW.fieldroutes.{table_name} 
-                            (OfficeID, LoadDatetimeUTC, RawData, TransactionType)
-                            SELECT %s, %s, TO_VARIANT(PARSE_JSON(%s)), %s
-                        """, batch)
-                    else:
-                        # Standard entities - use simple parameterized insert
-                        cursor.executemany(f"""
-                            INSERT INTO RAW.fieldroutes.{table_name} 
+                cursor.execute(f"""
+                    INSERT INTO RAW.fieldroutes.{table_name} 
+                    (OfficeID, LoadDatetimeUTC, RawData, TransactionType)
+                    SELECT 
+                        value[0]::INT,
+                        value[1]::TIMESTAMP_NTZ,
+                        PARSE_JSON(value[2]),
+                        value[3]::STRING
+                    FROM (
+                        SELECT ARRAY_CONSTRUCT(?, ?, ?, ?) AS value
+                        FROM TABLE(FLATTEN(INPUT => ?))
+                    )
+                """, (
+                    office_ids,
+                    timestamps, 
+                    json_data,
+                    trans_types,
+                    list(range(len(data_rows)))
+                ))
+            else:
+                # For standard entities - insert in batches to avoid size limits
+                batch_size = 5000
+                total_inserted = 0
+                
+                for i in range(0, len(data_rows), batch_size):
+                    batch = data_rows[i:i + batch_size]
+                    batch_count = len(batch)
+                    
+                    # Prepare arrays for this batch
+                    office_ids = [row[0] for row in batch]
+                    timestamps = [row[1] for row in batch] 
+                    json_data = [row[2] for row in batch]
+                    
+                    try:
+                        # Use array binding for efficient bulk insert
+                        cursor.execute(f"""
+                            INSERT INTO RAW.fieldroutes.{table_name}
                             (OfficeID, LoadDatetimeUTC, RawData)
-                            SELECT %s, %s, TO_VARIANT(PARSE_JSON(%s))
-                        """, batch)
-                    
-                    inserted_count += len(batch)
-                    logger.info(f"Inserted batch {i//batch_size + 1}: {inserted_count}/{len(data_rows)} records")
-                    
-                except Exception as e:
-                    logger.error(f"Failed to insert batch {i//batch_size + 1}: {str(e)}")
-                    # Try alternative method for this batch
-                    logger.info("Retrying batch with individual inserts...")
-                    for row in batch:
-                        try:
-                            if len(row) == 4:  # Financial transaction
+                            SELECT 
+                                o.value::INT,
+                                t.value::TIMESTAMP_NTZ,
+                                PARSE_JSON(j.value)
+                            FROM 
+                                TABLE(FLATTEN(INPUT => %s)) o,
+                                TABLE(FLATTEN(INPUT => %s)) t,
+                                TABLE(FLATTEN(INPUT => %s)) j
+                            WHERE o.index = t.index AND t.index = j.index
+                        """, (office_ids, timestamps, json_data))
+                        
+                        total_inserted += batch_count
+                        logger.info(f"Inserted batch {i//batch_size + 1}: {total_inserted}/{len(data_rows)} records")
+                        
+                    except Exception as e:
+                        logger.error(f"Batch insert failed: {str(e)}")
+                        logger.info("Falling back to individual inserts for this batch...")
+                        
+                        # Fallback to individual inserts
+                        for row in batch:
+                            try:
                                 cursor.execute(f"""
-                                    INSERT INTO RAW.fieldroutes.{table_name} 
-                                    (OfficeID, LoadDatetimeUTC, RawData, TransactionType)
-                                    SELECT %s, %s, TO_VARIANT(PARSE_JSON(%s)), %s
-                                """, row)
-                            else:
-                                cursor.execute(f"""
-                                    INSERT INTO RAW.fieldroutes.{table_name} 
+                                    INSERT INTO RAW.fieldroutes.{table_name}
                                     (OfficeID, LoadDatetimeUTC, RawData)
-                                    SELECT %s, %s, TO_VARIANT(PARSE_JSON(%s))
+                                    VALUES (%s, %s, PARSE_JSON(%s))
                                 """, row)
-                            inserted_count += 1
-                        except Exception as row_error:
-                            logger.error(f"Failed to insert record: {row_error}")
-                            logger.debug(f"Problem record: {row[2][:200]}...")  # First 200 chars of JSON
+                                total_inserted += 1
+                            except Exception as row_e:
+                                logger.error(f"Failed to insert individual record: {str(row_e)[:200]}")
             
             # Update watermark
             cursor.execute("""
