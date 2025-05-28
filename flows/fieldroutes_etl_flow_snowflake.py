@@ -402,22 +402,25 @@ def fetch_entity(
         sf_connector = SnowflakeConnector.load("snowflake-altapestdb")
         
         # Prepare data for bulk insert
-        # Convert records to proper format for Snowflake
+        # Convert records to JSON strings for Snowflake
         data_rows = []
         for record in all_records:
+            # Convert dict to JSON string
+            json_str = json.dumps(record, ensure_ascii=False)
+            
             # For financial transactions, add the transaction type
             if entity in ["disbursement", "chargeback"]:
                 data_rows.append({
                     "office_id": office["office_id"],
                     "load_timestamp": load_timestamp,
-                    "raw_data": record,  # Pass as dict, not JSON string
+                    "raw_data": json_str,  # JSON string
                     "transaction_type": entity
                 })
             else:
                 data_rows.append({
                     "office_id": office["office_id"],
                     "load_timestamp": load_timestamp,
-                    "raw_data": record  # Pass as dict, not JSON string
+                    "raw_data": json_str  # JSON string
                 })
         
         # Bulk insert using Snowflake's executemany
@@ -436,18 +439,18 @@ def fetch_entity(
             
             if entity in ["disbursement", "chargeback"]:
                 # Special handling for financial transactions
-                # Use Snowflake's native JSON handling
+                # Use PARSE_JSON to convert JSON string to VARIANT
                 cursor.executemany(f"""
                     INSERT INTO RAW.fieldroutes.{table_name} 
                     (OfficeID, LoadDatetimeUTC, RawData, TransactionType)
-                    VALUES (%(office_id)s, %(load_timestamp)s, %(raw_data)s, %(transaction_type)s)
+                    SELECT %(office_id)s, %(load_timestamp)s, PARSE_JSON(%(raw_data)s), %(transaction_type)s
                 """, data_rows)
             else:
-                # Use Snowflake's native JSON handling
+                # Use PARSE_JSON to convert JSON string to VARIANT
                 cursor.executemany(f"""
                     INSERT INTO RAW.fieldroutes.{table_name} 
                     (OfficeID, LoadDatetimeUTC, RawData)
-                    VALUES (%(office_id)s, %(load_timestamp)s, %(raw_data)s)
+                    SELECT %(office_id)s, %(load_timestamp)s, PARSE_JSON(%(raw_data)s)
                 """, data_rows)
             
             # Update watermark
