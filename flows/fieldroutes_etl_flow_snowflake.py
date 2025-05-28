@@ -402,26 +402,23 @@ def fetch_entity(
         sf_connector = SnowflakeConnector.load("snowflake-altapestdb")
         
         # Prepare data for bulk insert
-        # Convert records to JSON strings for Snowflake
+        # Keep records as Python objects for Snowflake to handle
         data_rows = []
         for record in all_records:
-            # Convert dict to JSON string
-            json_str = json.dumps(record, ensure_ascii=False)
-            
             # For financial transactions, add the transaction type
             if entity in ["disbursement", "chargeback"]:
-                data_rows.append({
-                    "office_id": office["office_id"],
-                    "load_timestamp": load_timestamp,
-                    "raw_data": json_str,  # JSON string
-                    "transaction_type": entity
-                })
+                data_rows.append((
+                    office["office_id"],
+                    load_timestamp,
+                    json.dumps(record),  # JSON string
+                    entity  # transaction_type
+                ))
             else:
-                data_rows.append({
-                    "office_id": office["office_id"],
-                    "load_timestamp": load_timestamp,
-                    "raw_data": json_str  # JSON string
-                })
+                data_rows.append((
+                    office["office_id"],
+                    load_timestamp,
+                    json.dumps(record)  # JSON string
+                ))
         
         # Bulk insert using Snowflake's executemany
         with sf_connector.get_connection() as conn:
@@ -437,40 +434,54 @@ def fetch_entity(
             # Bulk insert new data
             logger.info(f"Inserting {len(data_rows)} records into {table_name}")
             
-            # Insert records in batches to avoid multi-row insert issues
+            # Insert records in batches using TO_VARIANT for JSON conversion
             batch_size = 1000
             inserted_count = 0
             
             for i in range(0, len(data_rows), batch_size):
                 batch = data_rows[i:i + batch_size]
                 
-                if entity in ["disbursement", "chargeback"]:
-                    # Special handling for financial transactions
-                    # Prepare batch data as tuples for executemany
-                    batch_tuples = [
-                        (row["office_id"], row["load_timestamp"], row["raw_data"], row["transaction_type"])
-                        for row in batch
-                    ]
-                    cursor.executemany(f"""
-                        INSERT INTO RAW.fieldroutes.{table_name} 
-                        (OfficeID, LoadDatetimeUTC, RawData, TransactionType)
-                        VALUES (%s, %s, PARSE_JSON(%s), %s)
-                    """, batch_tuples)
-                else:
-                    # Standard entities  
-                    # Prepare batch data as tuples for executemany
-                    batch_tuples = [
-                        (row["office_id"], row["load_timestamp"], row["raw_data"])
-                        for row in batch
-                    ]
-                    cursor.executemany(f"""
-                        INSERT INTO RAW.fieldroutes.{table_name} 
-                        (OfficeID, LoadDatetimeUTC, RawData)
-                        VALUES (%s, %s, PARSE_JSON(%s))
-                    """, batch_tuples)
-                
-                inserted_count += len(batch)
-                logger.info(f"Inserted batch {i//batch_size + 1}: {inserted_count}/{len(data_rows)} records")
+                try:
+                    if entity in ["disbursement", "chargeback"]:
+                        # Special handling for financial transactions
+                        cursor.executemany(f"""
+                            INSERT INTO RAW.fieldroutes.{table_name} 
+                            (OfficeID, LoadDatetimeUTC, RawData, TransactionType)
+                            SELECT %s, %s, TO_VARIANT(PARSE_JSON(%s)), %s
+                        """, batch)
+                    else:
+                        # Standard entities - use simple parameterized insert
+                        cursor.executemany(f"""
+                            INSERT INTO RAW.fieldroutes.{table_name} 
+                            (OfficeID, LoadDatetimeUTC, RawData)
+                            SELECT %s, %s, TO_VARIANT(PARSE_JSON(%s))
+                        """, batch)
+                    
+                    inserted_count += len(batch)
+                    logger.info(f"Inserted batch {i//batch_size + 1}: {inserted_count}/{len(data_rows)} records")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to insert batch {i//batch_size + 1}: {str(e)}")
+                    # Try alternative method for this batch
+                    logger.info("Retrying batch with individual inserts...")
+                    for row in batch:
+                        try:
+                            if len(row) == 4:  # Financial transaction
+                                cursor.execute(f"""
+                                    INSERT INTO RAW.fieldroutes.{table_name} 
+                                    (OfficeID, LoadDatetimeUTC, RawData, TransactionType)
+                                    SELECT %s, %s, TO_VARIANT(PARSE_JSON(%s)), %s
+                                """, row)
+                            else:
+                                cursor.execute(f"""
+                                    INSERT INTO RAW.fieldroutes.{table_name} 
+                                    (OfficeID, LoadDatetimeUTC, RawData)
+                                    SELECT %s, %s, TO_VARIANT(PARSE_JSON(%s))
+                                """, row)
+                            inserted_count += 1
+                        except Exception as row_error:
+                            logger.error(f"Failed to insert record: {row_error}")
+                            logger.debug(f"Problem record: {row[2][:200]}...")  # First 200 chars of JSON
             
             # Update watermark
             cursor.execute("""
