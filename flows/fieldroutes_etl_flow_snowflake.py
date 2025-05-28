@@ -150,70 +150,170 @@ def fetch_entity(
         params[date_field] = json.dumps(date_filter)
         logger.info(f"Using date filter on {date_field}: {date_filter}")
     
-    # == Step 1: Search for IDs ================================================
+    # == Step 1: Search for IDs with pagination for 50K limit ==================
     search_url = f"{base_url}/{entity}/search"
     logger.info(f"Searching {entity} with params: {params}")
     
     all_ids = []
+    last_id = None
+    page_count = 0
     
-    try:
-        search_data = make_api_request(search_url, headers, params)
+    while True:
+        page_count += 1
+        current_params = params.copy()
         
-        logger.info(f"Search response success: {search_data.get('success', False)}")
-        logger.info(f"Count: {search_data.get('count', 0)}")
-        
-        # The propertyName field tells us where the IDs are
-        if "propertyName" in search_data:
-            id_field = search_data["propertyName"]
-            logger.info(f"IDs are in field: {id_field}")
+        # Add pagination filter if we have a last_id
+        if last_id is not None:
+            # Get the primary key field name from entity metadata
+            pk_field = {
+                "customer": "customerID",
+                "employee": "employeeID", 
+                "office": "officeID",
+                "region": "regionID",
+                "serviceType": "serviceTypeID",
+                "customerSource": "customerSourceID",
+                "genericFlag": "genericFlagID",
+                "appointment": "appointmentID",
+                "subscription": "subscriptionID",
+                "route": "routeID",
+                "ticket": "ticketID",
+                "ticketItem": "ticketItemID",
+                "payment": "paymentID",
+                "appliedPayment": "appliedPaymentID",
+                "note": "noteID",
+                "task": "taskID",
+                "appointmentReminder": "appointmentReminderID",
+                "door": "doorID",
+                "disbursement": "disbursementID",
+                "chargeback": "chargebackID",
+                "flagAssignment": "flagAssignmentID"
+            }.get(entity, f"{entity}ID")
             
-            if id_field in search_data:
-                all_ids = search_data[id_field]
-                logger.info(f"Found {len(all_ids)} IDs in {id_field}")
-        else:
-            # Fallback - try common patterns
-            possible_fields = [
-                f"{entity}IDs",
-                f"{entity}IDsNoDataExported",
-                "ids"
-            ]
-            for field in possible_fields:
-                if field in search_data and search_data[field]:
-                    all_ids = search_data[field]
-                    logger.info(f"Found {len(all_ids)} IDs in {field}")
-                    break
-        
-        # For dateUpdated entities, also search by dateAdded (only if we have date windows)
-        if date_field == "dateUpdated" and pt_start and pt_end:
-            logger.info(f"Performing additional search on dateAdded for {entity}")
-            
-            params_created = params.copy()
-            params_created.pop("dateUpdated", None)
-            params_created["dateAdded"] = json.dumps({
-                "operator": "BETWEEN",
-                "value": [
-                    pt_start.strftime("%Y-%m-%d"),
-                    pt_end.strftime("%Y-%m-%d")
-                ]
+            current_params[pk_field] = json.dumps({
+                "operator": ">",
+                "value": last_id
             })
+            logger.info(f"Page {page_count}: Searching for {pk_field} > {last_id}")
+        
+        try:
+            search_data = make_api_request(search_url, headers, current_params)
+            
+            if page_count == 1:
+                logger.info(f"Search response success: {search_data.get('success', False)}")
+                logger.info(f"Total count: {search_data.get('count', 0)}")
+            
+            page_ids = []
+            
+            # The propertyName field tells us where the IDs are
+            if "propertyName" in search_data:
+                id_field = search_data["propertyName"]
+                if id_field in search_data:
+                    page_ids = search_data[id_field]
+            else:
+                # Fallback - try common patterns
+                possible_fields = [
+                    f"{entity}IDs",
+                    f"{entity}IDsNoDataExported",
+                    "ids"
+                ]
+                for field in possible_fields:
+                    if field in search_data and search_data[field]:
+                        page_ids = search_data[field]
+                        break
+            
+            if not page_ids:
+                logger.info(f"No more IDs found on page {page_count}")
+                break
+                
+            all_ids.extend(page_ids)
+            logger.info(f"Page {page_count}: Found {len(page_ids)} IDs (total so far: {len(all_ids)})")
+            
+            # Check if we hit the 50K limit and need to paginate
+            if len(page_ids) == 50000:
+                last_id = max(page_ids)
+                logger.warning(f"Hit 50K limit on page {page_count}, will fetch next page")
+                continue
+            else:
+                # Less than 50K means we got all records
+                break
+                
+        except Exception as e:
+            logger.error(f"Search failed on page {page_count}: {str(e)}")
+            if page_count == 1:
+                raise  # Re-raise if first page fails
+            else:
+                break  # Stop pagination on error but keep what we have
+        
+    # For dateUpdated entities, also search by dateAdded (only if we have date windows)
+    if date_field == "dateUpdated" and pt_start and pt_end and len(all_ids) > 0:
+        logger.info(f"Performing additional search on dateAdded for {entity}")
+        
+        params_created = params.copy()
+        params_created.pop("dateUpdated", None)
+        params_created["dateAdded"] = json.dumps({
+            "operator": "BETWEEN",
+            "value": [
+                pt_start.strftime("%Y-%m-%d"),
+                pt_end.strftime("%Y-%m-%d")
+            ]
+        })
+        
+        # Search for records created in the date range (with pagination)
+        created_ids = []
+        last_id = None
+        page_count = 0
+        
+        while True:
+            page_count += 1
+            current_params = params_created.copy()
+            
+            if last_id is not None:
+                pk_field = {
+                    "customer": "customerID",
+                    "employee": "employeeID",
+                    "appointment": "appointmentID",
+                    "subscription": "subscriptionID",
+                    "route": "routeID",
+                    "ticket": "ticketID",
+                    "ticketItem": "ticketItemID",
+                    "payment": "paymentID",
+                    "appliedPayment": "appliedPaymentID"
+                }.get(entity, f"{entity}ID")
+                
+                current_params[pk_field] = json.dumps({
+                    "operator": ">",
+                    "value": last_id
+                })
             
             try:
-                created_data = make_api_request(search_url, headers, params_created)
+                created_data = make_api_request(search_url, headers, current_params)
                 
+                page_ids = []
                 if "propertyName" in created_data and created_data["propertyName"] in created_data:
                     id_field = created_data["propertyName"]
-                    created_ids = created_data[id_field]
-                    logger.info(f"Found {len(created_ids)} additional IDs from dateAdded search")
+                    page_ids = created_data[id_field]
+                
+                if not page_ids:
+                    break
                     
-                    # Combine and deduplicate
-                    all_ids = list(set(all_ids + created_ids))
+                created_ids.extend(page_ids)
+                
+                if len(page_ids) == 50000:
+                    last_id = max(page_ids)
+                    logger.warning(f"Hit 50K limit on dateAdded search page {page_count}")
+                    continue
+                else:
+                    break
                     
             except Exception as e:
                 logger.warning(f"Failed to search by dateAdded: {e}")
+                break
         
-    except Exception as e:
-        logger.error(f"Search failed for {entity}: {str(e)}")
-        raise
+        if created_ids:
+            logger.info(f"Found {len(created_ids)} additional IDs from dateAdded search")
+            # Combine and deduplicate
+            all_ids = list(set(all_ids + created_ids))
+            logger.info(f"Total unique IDs after combining: {len(all_ids)}")
     
     if not all_ids:
         logger.warning(f"No IDs found for {entity} in office {office['office_id']}")
