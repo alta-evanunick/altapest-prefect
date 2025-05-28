@@ -158,7 +158,7 @@ def test_customer_office1():
         if customers:
             logger.info("Testing Snowflake insert with 1 record...")
             
-            load_timestamp = datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+            load_timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
             test_record = customers[0]
             
             with sf_connector.get_connection() as conn:

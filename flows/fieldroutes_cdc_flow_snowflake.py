@@ -30,7 +30,7 @@ def run_cdc_fieldroutes_etl():
     logger = get_run_logger()
     
     # CDC window: last 2 hours with 15-minute overlap for safety
-    now = datetime.datetime.now(datetime.UTC)
+    now = datetime.datetime.utcnow()
     window_start = now - datetime.timedelta(hours=2, minutes=15)
     window_end = now
     

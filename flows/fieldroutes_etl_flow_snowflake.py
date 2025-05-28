@@ -295,7 +295,7 @@ def fetch_entity(
         return len(all_ids), 0
     
     # == Step 3: Write directly to Snowflake ===============================
-    load_timestamp = window_end.strftime("%Y-%m-%d %H:%M:%S") if window_end else datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%d %H:%M:%S")
+    load_timestamp = window_end.strftime("%Y-%m-%d %H:%M:%S") if window_end else datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
     try:
         sf_connector = SnowflakeConnector.load("snowflake-altapestdb")

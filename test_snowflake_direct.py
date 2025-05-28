@@ -3,9 +3,15 @@ Test script for FieldRoutes API to Snowflake direct load
 Tests a single entity for a single office to verify the pipeline works
 """
 import sys
+import os
 import logging
 from datetime import datetime, timedelta
-from flows.fieldroutes_etl_flow_snowflake import fetch_entity, validate_snowflake_schema
+
+# Add the project root to Python path
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+
+# Import directly from the snowflake flow module
+import flows.fieldroutes_etl_flow_snowflake as snowflake_flow
 from prefect.blocks.system import Secret
 from prefect_snowflake import SnowflakeConnector
 
@@ -23,7 +29,7 @@ def test_single_entity(office_id: int = None, entity_name: str = "customer"):
     
     # First validate schema
     logger.info("Validating Snowflake schema...")
-    if not validate_snowflake_schema():
+    if not snowflake_flow.validate_snowflake_schema():
         logger.error("Schema validation failed!")
         return False
     
@@ -68,7 +74,7 @@ def test_single_entity(office_id: int = None, entity_name: str = "customer"):
     logger.info(f"Base URL: {base_url}")
     
     # Find entity metadata
-    from flows.fieldroutes_etl_flow_snowflake import ENTITY_META
+    ENTITY_META = snowflake_flow.ENTITY_META
     
     meta = None
     for ep, tbl, dim, small, df in ENTITY_META:
@@ -94,7 +100,7 @@ def test_single_entity(office_id: int = None, entity_name: str = "customer"):
     logger.info(f"Testing incremental load from {window_start} to {window_end}")
     
     try:
-        fetched, loaded = fetch_entity(
+        fetched, loaded = snowflake_flow.fetch_entity(
             office=office,
             meta=meta,
             window_start=window_start,
