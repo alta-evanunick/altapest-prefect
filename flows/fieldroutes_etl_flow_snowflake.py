@@ -9,7 +9,12 @@ import datetime
 from typing import Dict, List, Optional, Tuple
 import requests
 import pytz
-import orjson
+try:
+    import orjson
+    HAS_ORJSON = True
+except ImportError:
+    import json
+    HAS_ORJSON = False
 from prefect import flow, task, get_run_logger
 from prefect.blocks.system import Secret
 from prefect_snowflake import SnowflakeConnector
@@ -300,17 +305,19 @@ def fetch_entity(
         for record in all_records:
             # For financial transactions, add the transaction type
             if entity in ["disbursement", "chargeback"]:
+                json_data = orjson.dumps(record).decode('utf-8') if HAS_ORJSON else json.dumps(record)
                 data_rows.append((
                     office["office_id"],
                     load_timestamp,
-                    orjson.dumps(record).decode('utf-8'),  # Fast JSON serialization
+                    json_data,
                     entity  # transaction_type
                 ))
             else:
+                json_data = orjson.dumps(record).decode('utf-8') if HAS_ORJSON else json.dumps(record)
                 data_rows.append((
                     office["office_id"],
                     load_timestamp,
-                    orjson.dumps(record).decode('utf-8')
+                    json_data
                 ))
         
         # Bulk insert using Snowflake's executemany
