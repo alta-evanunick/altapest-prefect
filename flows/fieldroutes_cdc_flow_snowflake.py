@@ -5,6 +5,7 @@ Handles incremental updates for high-velocity entities during business hours
 """
 
 import datetime
+from datetime import timezone
 from typing import Dict, List
 from prefect import flow, task, get_run_logger
 from prefect.blocks.system import Secret
@@ -30,7 +31,7 @@ def run_cdc_fieldroutes_etl():
     logger = get_run_logger()
     
     # CDC window: last 2 hours with 15-minute overlap for safety
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(timezone.utc)
     window_start = now - datetime.timedelta(hours=2, minutes=15)
     window_end = now
     

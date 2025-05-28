@@ -158,9 +158,13 @@ def test_customer_office1():
         if customers:
             logger.info("Testing Snowflake insert with 1 record...")
             
-            load_timestamp = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+            # Use timezone-aware datetime
+            from datetime import timezone
+            load_timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
             test_record = customers[0]
             
+            # Get a fresh connection for the insert
+            sf_connector = SnowflakeConnector.load("snowflake-altapestdb")
             with sf_connector.get_connection() as conn:
                 cursor = conn.cursor()
                 

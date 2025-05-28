@@ -3,6 +3,7 @@ Deployment script for FieldRoutes to Snowflake Direct Load
 Creates Prefect deployments for both nightly and CDC flows
 """
 import datetime
+from datetime import timezone
 import time
 from typing import Dict, Optional
 from prefect import flow, get_run_logger
@@ -23,7 +24,7 @@ def run_nightly_fieldroutes_etl(
     """Prefect flow to perform a full nightly extract for all offices and entities.
     Writes directly to Snowflake, bypassing Azure."""
     logger = get_run_logger()
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(timezone.utc)
     window_end = now
     window_start = now - datetime.timedelta(days=1)
     
@@ -191,7 +192,7 @@ def run_cdc_fieldroutes_etl():
         for meta in ENTITY_META if meta[0] in CDC_ENTITIES
     }
     
-    now = datetime.datetime.utcnow()
+    now = datetime.datetime.now(timezone.utc)
     
     logger.info(f"Starting CDC FieldRoutes ETL (Direct to Snowflake) for {len(sorted_offices)} offices")
     logger.info(f"CDC entities: {list(meta_dict.keys())}")

@@ -6,6 +6,7 @@ Bypasses Azure Blob Storage and writes directly to Snowflake
 import json
 import time
 import datetime
+from datetime import timezone
 from typing import Dict, List, Optional, Tuple
 import requests
 import pytz
@@ -295,7 +296,7 @@ def fetch_entity(
         return len(all_ids), 0
     
     # == Step 3: Write directly to Snowflake ===============================
-    load_timestamp = window_end.strftime("%Y-%m-%d %H:%M:%S") if window_end else datetime.datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+    load_timestamp = window_end.strftime("%Y-%m-%d %H:%M:%S") if window_end else datetime.datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
 
     try:
         sf_connector = SnowflakeConnector.load("snowflake-altapestdb")
