@@ -431,85 +431,110 @@ def fetch_entity(
                 WHERE OfficeID = %s AND LoadDatetimeUTC = %s
             """, (office["office_id"], load_timestamp))
             
-            # Bulk insert new data
-            logger.info(f"Inserting {len(data_rows)} records into {table_name}")
+            # Insert using staging table approach to handle PARSE_JSON errors
+            logger.info(f"Inserting {len(data_rows)} records into {table_name} using staging approach")
             
-            # Use Snowflake's ability to handle JSON objects directly
-            # Insert all records at once using array binding
+            # Create staging table if not exists
+            staging_table = f"{table_name}_staging"
+            cursor.execute(f"""
+                CREATE TABLE IF NOT EXISTS RAW.fieldroutes.{staging_table} (
+                    OfficeID INTEGER,
+                    LoadDatetimeUTC TIMESTAMP_NTZ,
+                    RawDataString VARCHAR
+                    {", TransactionType VARCHAR" if entity in ["disbursement", "chargeback"] else ""}
+                )
+            """)
+            
+            # Clear staging table for this office
+            cursor.execute(f"""
+                DELETE FROM RAW.fieldroutes.{staging_table} 
+                WHERE OfficeID = %s
+            """, (office["office_id"],))
+            
+            # Prepare insert SQL based on entity type
             if entity in ["disbursement", "chargeback"]:
-                # For financial transactions
-                office_ids = [row[0] for row in data_rows]
-                timestamps = [row[1] for row in data_rows]
-                json_data = [row[2] for row in data_rows]
-                trans_types = [row[3] for row in data_rows]
-                
+                insert_sql = f"""
+                    INSERT INTO RAW.fieldroutes.{staging_table} 
+                    (OfficeID, LoadDatetimeUTC, RawDataString, TransactionType)
+                    VALUES (%s, %s, %s, %s)
+                """
+            else:
+                insert_sql = f"""
+                    INSERT INTO RAW.fieldroutes.{staging_table} 
+                    (OfficeID, LoadDatetimeUTC, RawDataString)
+                    VALUES (%s, %s, %s)
+                """
+            
+            # Insert in smaller batches to avoid any size limits
+            batch_size = 1000
+            total_staged = 0
+            
+            for i in range(0, len(data_rows), batch_size):
+                batch = data_rows[i:i + batch_size]
+                cursor.executemany(insert_sql, batch)
+                total_staged += len(batch)
+                logger.info(f"Staged batch {i//batch_size + 1}: {total_staged}/{len(data_rows)} records")
+            
+            # Now move from staging to final table with TRY_PARSE_JSON
+            if entity in ["disbursement", "chargeback"]:
                 cursor.execute(f"""
                     INSERT INTO RAW.fieldroutes.{table_name} 
                     (OfficeID, LoadDatetimeUTC, RawData, TransactionType)
                     SELECT 
-                        value[0]::INT,
-                        value[1]::TIMESTAMP_NTZ,
-                        PARSE_JSON(value[2]),
-                        value[3]::STRING
-                    FROM (
-                        SELECT ARRAY_CONSTRUCT(?, ?, ?, ?) AS value
-                        FROM TABLE(FLATTEN(INPUT => ?))
-                    )
-                """, (
-                    office_ids,
-                    timestamps, 
-                    json_data,
-                    trans_types,
-                    list(range(len(data_rows)))
-                ))
+                        OfficeID,
+                        LoadDatetimeUTC,
+                        TRY_PARSE_JSON(RawDataString),
+                        TransactionType
+                    FROM RAW.fieldroutes.{staging_table}
+                    WHERE OfficeID = %s
+                    AND TRY_PARSE_JSON(RawDataString) IS NOT NULL
+                """, (office["office_id"],))
             else:
-                # For standard entities - insert in batches to avoid size limits
-                batch_size = 5000
-                total_inserted = 0
+                cursor.execute(f"""
+                    INSERT INTO RAW.fieldroutes.{table_name} 
+                    (OfficeID, LoadDatetimeUTC, RawData)
+                    SELECT 
+                        OfficeID,
+                        LoadDatetimeUTC,
+                        TRY_PARSE_JSON(RawDataString)
+                    FROM RAW.fieldroutes.{staging_table}
+                    WHERE OfficeID = %s
+                    AND TRY_PARSE_JSON(RawDataString) IS NOT NULL
+                """, (office["office_id"],))
+            
+            # Get count of successful inserts
+            cursor.execute(f"""
+                SELECT COUNT(*) 
+                FROM RAW.fieldroutes.{staging_table}
+                WHERE OfficeID = %s
+                AND TRY_PARSE_JSON(RawDataString) IS NULL
+            """, (office["office_id"],))
+            
+            failed_count = cursor.fetchone()[0]
+            if failed_count > 0:
+                logger.warning(f"WARNING: {failed_count} records failed JSON parsing and were skipped")
                 
-                for i in range(0, len(data_rows), batch_size):
-                    batch = data_rows[i:i + batch_size]
-                    batch_count = len(batch)
-                    
-                    # Prepare arrays for this batch
-                    office_ids = [row[0] for row in batch]
-                    timestamps = [row[1] for row in batch] 
-                    json_data = [row[2] for row in batch]
-                    
-                    try:
-                        # Use array binding for efficient bulk insert
-                        cursor.execute(f"""
-                            INSERT INTO RAW.fieldroutes.{table_name}
-                            (OfficeID, LoadDatetimeUTC, RawData)
-                            SELECT 
-                                o.value::INT,
-                                t.value::TIMESTAMP_NTZ,
-                                PARSE_JSON(j.value)
-                            FROM 
-                                TABLE(FLATTEN(INPUT => %s)) o,
-                                TABLE(FLATTEN(INPUT => %s)) t,
-                                TABLE(FLATTEN(INPUT => %s)) j
-                            WHERE o.index = t.index AND t.index = j.index
-                        """, (office_ids, timestamps, json_data))
-                        
-                        total_inserted += batch_count
-                        logger.info(f"Inserted batch {i//batch_size + 1}: {total_inserted}/{len(data_rows)} records")
-                        
-                    except Exception as e:
-                        logger.error(f"Batch insert failed: {str(e)}")
-                        logger.info("Falling back to individual inserts for this batch...")
-                        
-                        # Fallback to individual inserts
-                        for row in batch:
-                            try:
-                                cursor.execute(f"""
-                                    INSERT INTO RAW.fieldroutes.{table_name}
-                                    (OfficeID, LoadDatetimeUTC, RawData)
-                                    VALUES (%s, %s, PARSE_JSON(%s))
-                                """, row)
-                                total_inserted += 1
-                            except Exception as row_e:
-                                logger.error(f"Failed to insert individual record: {str(row_e)[:200]}")
+                # Log a sample of failed records for debugging
+                cursor.execute(f"""
+                    SELECT LEFT(RawDataString, 200) 
+                    FROM RAW.fieldroutes.{staging_table}
+                    WHERE OfficeID = %s
+                    AND TRY_PARSE_JSON(RawDataString) IS NULL
+                    LIMIT 5
+                """, (office["office_id"],))
+                
+                sample_failures = cursor.fetchall()
+                for i, (sample,) in enumerate(sample_failures):
+                    logger.warning(f"Failed JSON sample {i+1}: {sample}")
+            
+            # Clean up staging table
+            cursor.execute(f"""
+                DELETE FROM RAW.fieldroutes.{staging_table} 
+                WHERE OfficeID = %s
+            """, (office["office_id"],))
+            
+            total_inserted = total_staged - failed_count
+            logger.info(f"Successfully inserted {total_inserted} records (skipped {failed_count} invalid JSON)")
             
             # Update watermark
             cursor.execute("""
