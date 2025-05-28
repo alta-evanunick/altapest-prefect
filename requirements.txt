@@ -1,22 +1,23 @@
 # Core orchestration & blocks
-
 prefect
 prefect-snowflake
 
 # Snowflake connectivity
-
 snowflake-connector-python
 snowflake-sqlalchemy
 
 # HTTP
-
 requests
 
-# Data wrangling (optional but handy for future transforms/tests)
-
+# Data wrangling
 pandas
 pyarrow
 
-# Concurrency / retry helpers (pulled in by Prefect, listed explicitly for clarity)
+# Timezone handling
+pytz
 
+# JSON handling
+orjson  # Faster JSON serialization for large datasets
+
+# Concurrency / retry helpers
 tenacity
