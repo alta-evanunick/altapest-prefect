@@ -26,40 +26,40 @@ from prefect_snowflake import SnowflakeConnector
 # Format: (endpoint, table_name, is_dim, is_small, primary_date, secondary_date, unique_params)
 ENTITY_META = [
     # Dimension tables (reference data)
-    ("office",         "Office_Dim",          True,   True, None, None, {}),
-    ("region",         "Region_Dim",          True,   True, None, None, {}),
-    ("serviceType",    "ServiceType_Dim",     True,   True, None, None, {}),  # Not in CSV, keeping legacy
-    ("customerSource", "CustomerSource_Dim",  True,   True, None, None, {}),  # Not in CSV, keeping legacy
-    ("genericFlag",    "GenericFlag_Dim",     True,   True, None, None, {}),
-    ("cancellationReason", "CancellationReason_Dim", True, True, None, None, {}),
-    ("customerFlag",   "CustomerFlag_Dim",    True,   True, None, None, {}),
-    ("product",        "Product_Dim",         True,   True, None, None, {}),
-    ("reserviceReason", "ReserviceReason_Dim", True,  True, None, None, {}),
+    ("office",         "OFFICE_DIM",          True,   True, None, None, {}),
+    ("region",         "REGION_DIM",          True,   True, None, None, {}),
+    ("serviceType",    "SERVICETYPE_DIM",     True,   True, None, None, {}),  # Not in CSV, keeping legacy
+    ("customerSource", "CUSTOMERSOURCE_DIM",  True,   True, None, None, {}),  # Not in CSV, keeping legacy
+    ("genericFlag",    "GENERICFLAG_DIM",     True,   True, None, None, {}),
+    ("cancellationReason", "CANCELLATIONREASON_DIM", True, True, None, None, {}),
+    ("customerFlag",   "CUSTOMERFLAG_DIM",    True,   True, None, None, {}),
+    ("product",        "PRODUCT_DIM",         True,   True, None, None, {}),
+    ("reserviceReason", "RESERVICEREASON_DIM", True,  True, None, None, {}),
     
     # Fact tables (transactional data) - Aligned with CSV
-    ("customer",       "Customer_Fact",       False, False, "dateUpdated", "dateAdded", {"includeCancellationReason": 1}),
-    ("employee",       "Employee_Fact",       False, False, "dateUpdated", None, {}),
-    ("appointment",    "Appointment_Fact",    False, False, "dateUpdated", "dateAdded", {"includeCancellationReason": 1, "includeTargetPests": 1}),
-    ("subscription",   "Subscription_Fact",   False, False, "dateUpdated", "dateAdded", {}),
-    ("route",          "Route_Fact",          False, False, "dateUpdated", "date", {}),
-    ("ticket",         "Ticket_Fact",         False, False, "dateUpdated", "dateCreated", {}),
-    ("ticketItem",     "TicketItem_Fact",     False, False, "dateUpdated", "dateCreated", {}),
-    ("payment",        "Payment_Fact",        False, False, "dateUpdated", "dateAdded", {}),
-    ("appliedPayment", "AppliedPayment_Fact", False, False, "dateUpdated", "dateApplied", {}),
-    ("note",           "Note_Fact",           False, False, "dateUpdated", "dateAdded", {}),
-    ("task",           "Task_Fact",           False, False, "dateUpdated", "dateAdded", {}),
-    ("door",           "DoorKnock_Fact",      False, False, "timeCreated", None, {}),
-    ("disbursement",   "FinancialTransaction_Fact", False, False, "dateUpdated", "dateCreated", {}),
-    ("chargeback",     "FinancialTransaction_Fact", False, False, "dateUpdated", "dateCreated", {}),
-    ("additionalContacts", "AdditionalContacts_Fact", False, False, "dateUpdated", "dateCreated", {}),
-    ("disbursementItem", "DisbursementItem_Fact", False, False, "dateUpdated", "dateCreated", {}),
-    ("genericFlagAssignment", "GenericFlagAssignment_Fact", False, False, "dateUpdated", "dateCreated", {}),
-    ("knock",          "Knock_Fact",          False, False, "dateUpdated", "dateCreated", {}),
-    ("paymentProfile", "PaymentProfile_Fact", False, False, "dateUpdated", "dateCreated", {}),
+    ("customer",       "CUSTOMER_FACT",       False, False, "dateUpdated", "dateAdded", {"includeCancellationReason": 1}),
+    ("employee",       "EMPLOYEE_FACT",       False, False, "dateUpdated", None, {}),
+    ("appointment",    "APPOINTMENT_FACT",    False, False, "dateUpdated", "dateAdded", {"includeCancellationReason": 1, "includeTargetPests": 1}),
+    ("subscription",   "SUBSCRIPTION_FACT",   False, False, "dateUpdated", "dateAdded", {}),
+    ("route",          "ROUTE_FACT",          False, False, "dateUpdated", "date", {}),
+    ("ticket",         "TICKET_FACT",         False, False, "dateUpdated", "dateCreated", {}),
+    ("ticketItem",     "TICKETITEM_FACT",     False, False, "dateUpdated", "dateCreated", {}),
+    ("payment",        "PAYMENT_FACT",        False, False, "dateUpdated", "dateAdded", {}),
+    ("appliedPayment", "APPLIEDPAYMENT_FACT", False, False, "dateUpdated", "dateApplied", {}),
+    ("note",           "NOTE_FACT",           False, False, "dateUpdated", "dateAdded", {}),
+    ("task",           "TASK_FACT",           False, False, "dateUpdated", "dateAdded", {}),
+    ("door",           "DOORKNOCK_FACT",      False, False, "timeCreated", None, {}),
+    ("disbursement",   "FINANCIALTRANSACTION_FACT", False, False, "dateUpdated", "dateCreated", {}),
+    ("chargeback",     "FINANCIALTRANSACTION_FACT", False, False, "dateUpdated", "dateCreated", {}),
+    ("additionalContacts", "ADDITIONALCONTACTS_FACT", False, False, "dateUpdated", "dateCreated", {}),
+    ("disbursementItem", "DISBURSEMENTITEM_FACT", False, False, "dateUpdated", "dateCreated", {}),
+    ("genericFlagAssignment", "GENERICFLAGASSIGNMENT_FACT", False, False, "dateUpdated", "dateCreated", {}),
+    ("knock",          "KNOCK_FACT",          False, False, "dateUpdated", "dateCreated", {}),
+    ("paymentProfile", "PAYMENTPROFILE_FACT", False, False, "dateUpdated", "dateCreated", {}),
     
     # Legacy entities not in CSV but keeping for compatibility
-    ("appointmentReminder", "AppointmentReminder_Fact", False, False, "dateUpdated", None, {}),
-    ("flagAssignment", "FlagAssignment_Fact", False, False, "dateAdded", None, {}),
+    ("appointmentReminder", "APPOINTMENTREMINDER_FACT", False, False, "dateUpdated", None, {}),
+    ("flagAssignment", "FLAGASSIGNMENT_FACT", False, False, "dateAdded", None, {}),
 ]
 
 # Helper functions
@@ -401,6 +401,10 @@ def fetch_entity(
                 "serviceType": "serviceTypes",
                 "customerSource": "customerSources",
                 "genericFlag": "genericFlags",
+                "cancellationReason": "cancellationReasons",
+                "customerFlag": "customerFlags",
+                "product": "products",
+                "reserviceReason": "reserviceReasons",
                 "appointment": "appointments",
                 "subscription": "subscriptions",
                 "route": "routes",
@@ -414,6 +418,11 @@ def fetch_entity(
                 "door": "doors",
                 "disbursement": "disbursements",
                 "chargeback": "chargebacks",
+                "additionalContacts": "additionalContacts",
+                "disbursementItem": "disbursementItems",
+                "genericFlagAssignment": "genericFlagAssignments",
+                "knock": "knocks",
+                "paymentProfile": "paymentProfiles",
                 "flagAssignment": "flagAssignments"
             }
             
@@ -651,7 +660,7 @@ def process_customer_cancellation_reasons(offices: List[Dict], window_end: datet
             
             # Create the target table if it doesn't exist
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS RAW.fieldroutes.CustomerCancellationReasons_Fact (
+                CREATE TABLE IF NOT EXISTS RAW.fieldroutes.CUSTOMERCANCELLATIONREASONS_FACT (
                     OfficeID INTEGER,
                     CustomerID INTEGER,
                     CancellationReasonID INTEGER,
@@ -669,13 +678,13 @@ def process_customer_cancellation_reasons(offices: List[Dict], window_end: datet
                 
                 # Clear existing data for this office at this timestamp
                 cursor.execute("""
-                    DELETE FROM RAW.fieldroutes.CustomerCancellationReasons_Fact
+                    DELETE FROM RAW.fieldroutes.CUSTOMERCANCELLATIONREASONS_FACT
                     WHERE OfficeID = %s AND LoadDatetimeUTC = %s
                 """, (office['office_id'], load_timestamp))
                 
                 # Insert flattened cancellation reasons with dimension lookup
                 cursor.execute("""
-                    INSERT INTO RAW.fieldroutes.CustomerCancellationReasons_Fact
+                    INSERT INTO RAW.fieldroutes.CUSTOMERCANCELLATIONREASONS_FACT
                     (OfficeID, CustomerID, CancellationReasonID, CancellationReasonDescription, 
                      DateCancelled, LoadDatetimeUTC)
                     SELECT DISTINCT
@@ -688,18 +697,18 @@ def process_customer_cancellation_reasons(offices: List[Dict], window_end: datet
                         ) as CancellationReasonDescription,
                         c.RawData:dateCancelled::TIMESTAMP_NTZ as DateCancelled,
                         %s as LoadDatetimeUTC
-                    FROM RAW.fieldroutes.Customer_Fact c
+                    FROM RAW.fieldroutes.CUSTOMER_FACT c
                     CROSS JOIN LATERAL FLATTEN(
                         INPUT => c.RawData:cancellationReasonIDs,
                         OUTER => TRUE
                     ) cr
-                    LEFT JOIN RAW.fieldroutes.CancellationReason_Dim crd
+                    LEFT JOIN RAW.fieldroutes.CANCELLATIONREASON_DIM crd
                         ON crd.OfficeID = c.OfficeID
                         AND crd.RawData:cancellationReasonID::INTEGER = cr.value::INTEGER
                     WHERE c.OfficeID = %s
                     AND c.LoadDatetimeUTC = (
                         SELECT MAX(LoadDatetimeUTC) 
-                        FROM RAW.fieldroutes.Customer_Fact 
+                        FROM RAW.fieldroutes.CUSTOMER_FACT 
                         WHERE OfficeID = %s
                     )
                     AND cr.value IS NOT NULL
@@ -710,7 +719,7 @@ def process_customer_cancellation_reasons(offices: List[Dict], window_end: datet
                 # Get count of records processed
                 cursor.execute("""
                     SELECT COUNT(*) 
-                    FROM RAW.fieldroutes.CustomerCancellationReasons_Fact
+                    FROM RAW.fieldroutes.CUSTOMERCANCELLATIONREASONS_FACT
                     WHERE OfficeID = %s AND LoadDatetimeUTC = %s
                 """, (office['office_id'], load_timestamp))
                 

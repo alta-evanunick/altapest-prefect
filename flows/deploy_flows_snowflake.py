@@ -75,7 +75,9 @@ def run_nightly_fieldroutes_etl(
             "table": meta[1],
             "is_dim": meta[2],
             "small": meta[3],
-            "date_field": meta[4]
+            "primary_date": meta[4],
+            "secondary_date": meta[5],
+            "unique_params": meta[6]
         }
         for meta in ENTITY_META
     }
