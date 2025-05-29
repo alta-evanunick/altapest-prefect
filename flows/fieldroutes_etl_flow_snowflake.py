@@ -120,12 +120,19 @@ def fetch_entity(
     """
     logger = get_run_logger()
     
-    entity = meta["endpoint"]
-    table_name = meta["table"]
-    primary_date_field = meta["primary_date"]
-    secondary_date_field = meta["secondary_date"]
-    unique_params = meta.get("unique_params", {})
-    is_dimension = meta["is_dim"]
+    # Extract metadata with error handling
+    try:
+        entity = meta["endpoint"]
+        table_name = meta["table"]
+        primary_date_field = meta.get("primary_date")
+        secondary_date_field = meta.get("secondary_date")
+        unique_params = meta.get("unique_params", {})
+        is_dimension = meta.get("is_dim", False)
+    except KeyError as e:
+        logger.error(f"KeyError accessing meta dictionary: {e}")
+        logger.error(f"Meta dict keys: {list(meta.keys())}")
+        logger.error(f"Meta dict content: {meta}")
+        raise
     
     logger.info(f"Starting fetch for {entity} - Office {office['office_id']} ({office['office_name']})")
     
@@ -833,19 +840,19 @@ def run_fieldroutes_etl(
         if entity_filter and meta[0] not in entity_filter:
             continue
             
-        # Safely unpack metadata tuple
+        # Unpack metadata tuple - all tuples have exactly 7 elements
         entity_dict = {
             "endpoint": meta[0], 
             "table": meta[1], 
             "is_dim": meta[2], 
             "small": meta[3], 
-            "primary_date": meta[4] if len(meta) > 4 else None,
-            "secondary_date": meta[5] if len(meta) > 5 else None,
-            "unique_params": meta[6] if len(meta) > 6 else {}
+            "primary_date": meta[4],
+            "secondary_date": meta[5],
+            "unique_params": meta[6]
         }
         
         # Debug log for troubleshooting
-        logger.debug(f"Entity {meta[0]} metadata: primary_date={entity_dict['primary_date']}, secondary_date={entity_dict['secondary_date']}")
+        logger.info(f"Entity {meta[0]} metadata: primary_date={entity_dict.get('primary_date')}, secondary_date={entity_dict.get('secondary_date')}, keys={list(entity_dict.keys())}")
         
         entities_to_process.append(entity_dict)
     
