@@ -828,19 +828,26 @@ def run_fieldroutes_etl(
             })
     
     # Filter entities if specified
-    entities_to_process = [
-        {
+    entities_to_process = []
+    for meta in ENTITY_META:
+        if entity_filter and meta[0] not in entity_filter:
+            continue
+            
+        # Safely unpack metadata tuple
+        entity_dict = {
             "endpoint": meta[0], 
             "table": meta[1], 
             "is_dim": meta[2], 
             "small": meta[3], 
-            "primary_date": meta[4],
+            "primary_date": meta[4] if len(meta) > 4 else None,
             "secondary_date": meta[5] if len(meta) > 5 else None,
             "unique_params": meta[6] if len(meta) > 6 else {}
         }
-        for meta in ENTITY_META
-        if not entity_filter or meta[0] in entity_filter
-    ]
+        
+        # Debug log for troubleshooting
+        logger.debug(f"Entity {meta[0]} metadata: primary_date={entity_dict['primary_date']}, secondary_date={entity_dict['secondary_date']}")
+        
+        entities_to_process.append(entity_dict)
     
     logger.info(f"Processing {len(entities_to_process)} entities for {len(offices)} offices")
     

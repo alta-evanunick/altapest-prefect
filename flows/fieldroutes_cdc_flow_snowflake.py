@@ -61,19 +61,22 @@ def run_cdc_fieldroutes_etl():
             })
     
     # Filter entity metadata to only high-velocity entities
-    cdc_entities = [
-        {
+    cdc_entities = []
+    for meta in ENTITY_META:
+        if meta[0] not in HIGH_VELOCITY_ENTITIES:
+            continue
+            
+        # Safely unpack metadata tuple
+        entity_dict = {
             "endpoint": meta[0], 
             "table": meta[1], 
             "is_dim": meta[2], 
             "small": meta[3], 
-            "primary_date": meta[4],
+            "primary_date": meta[4] if len(meta) > 4 else None,
             "secondary_date": meta[5] if len(meta) > 5 else None,
             "unique_params": meta[6] if len(meta) > 6 else {}
         }
-        for meta in ENTITY_META
-        if meta[0] in HIGH_VELOCITY_ENTITIES
-    ]
+        cdc_entities.append(entity_dict)
     
     logger.info(f"Processing {len(cdc_entities)} high-velocity entities for {len(offices)} offices")
     
