@@ -13,9 +13,12 @@ from prefect_snowflake import SnowflakeConnector
 from .fieldroutes_etl_flow_snowflake import fetch_entity, ENTITY_META
 
 # Define which entities are "high-velocity" and need CDC
+# Updated based on FR_Entity_Matrix.csv velocity designations
 HIGH_VELOCITY_ENTITIES = {
-    "appointment", "ticket", "ticketItem", "payment", 
-    "appliedPayment", "task", "note", "flagAssignment"
+    "customer", "appointment", "ticket", "ticketItem", "payment", 
+    "appliedPayment", "task", "note", "knock", "route",
+    "subscription", "chargeback", "disbursementItem",
+    "appliedPayment", "genericFlagAssignment", "paymentProfile"
 }
 
 @flow(
@@ -59,9 +62,17 @@ def run_cdc_fieldroutes_etl():
     
     # Filter entity metadata to only high-velocity entities
     cdc_entities = [
-        {"endpoint": ep, "table": tbl, "is_dim": dim, "small": small, "date_field": df}
-        for ep, tbl, dim, small, df in ENTITY_META
-        if ep in HIGH_VELOCITY_ENTITIES
+        {
+            "endpoint": meta[0], 
+            "table": meta[1], 
+            "is_dim": meta[2], 
+            "small": meta[3], 
+            "primary_date": meta[4],
+            "secondary_date": meta[5] if len(meta) > 5 else None,
+            "unique_params": meta[6] if len(meta) > 6 else {}
+        }
+        for meta in ENTITY_META
+        if meta[0] in HIGH_VELOCITY_ENTITIES
     ]
     
     logger.info(f"Processing {len(cdc_entities)} high-velocity entities for {len(offices)} offices")

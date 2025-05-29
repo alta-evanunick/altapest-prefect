@@ -23,31 +23,43 @@ from prefect_snowflake import SnowflakeConnector
 # =============================================================================
 # Entity metadata configuration
 # =============================================================================
+# Format: (endpoint, table_name, is_dim, is_small, primary_date, secondary_date, unique_params)
 ENTITY_META = [
     # Dimension tables (reference data)
-    ("customer",       "Customer_Dim",        True,  False, "dateUpdated"),
-    ("employee",       "Employee_Dim",        True,  False, "dateUpdated"),
-    ("office",         "Office_Dim",          True,   True, "dateAdded"),
-    ("region",         "Region_Dim",          True,   True, "dateAdded"),
-    ("serviceType",    "ServiceType_Dim",     True,   True, "dateAdded"),
-    ("customerSource", "CustomerSource_Dim",  True,   True, "dateAdded"),
-    ("genericFlag",    "GenericFlag_Dim",     True,   True, "dateAdded"),
-
-    # Fact tables (transactional data)
-    ("appointment",    "Appointment_Fact",    False, False, "dateUpdated"),
-    ("subscription",   "Subscription_Fact",   False, False, "dateUpdated"),
-    ("route",          "Route_Fact",          False, False, "dateUpdated"),
-    ("ticket",         "Ticket_Dim",          False, False, "dateUpdated"),
-    ("ticketItem",     "TicketItem_Fact",     False, False, "dateUpdated"),
-    ("payment",        "Payment_Fact",        False, False, "dateUpdated"),
-    ("appliedPayment", "AppliedPayment_Fact", False, False, "dateUpdated"),
-    ("note",           "Note_Fact",           False, False, "dateAdded"),
-    ("task",           "Task_Fact",           False, False, "dateAdded"),
-    ("appointmentReminder", "AppointmentReminder_Fact", False, False, "dateUpdated"),
-    ("door",           "DoorKnock_Fact",      False, False, "dateUpdated"),
-    ("disbursement",   "FinancialTransaction_Fact", False, False, "dateUpdated"),
-    ("chargeback",     "FinancialTransaction_Fact", False, False, "dateUpdated"),
-    ("flagAssignment", "FlagAssignment_Fact", False, False, "dateAdded"),
+    ("office",         "Office_Dim",          True,   True, None, None, {}),
+    ("region",         "Region_Dim",          True,   True, None, None, {}),
+    ("serviceType",    "ServiceType_Dim",     True,   True, None, None, {}),  # Not in CSV, keeping legacy
+    ("customerSource", "CustomerSource_Dim",  True,   True, None, None, {}),  # Not in CSV, keeping legacy
+    ("genericFlag",    "GenericFlag_Dim",     True,   True, None, None, {}),
+    ("cancellationReason", "CancellationReason_Dim", True, True, None, None, {}),
+    ("customerFlag",   "CustomerFlag_Dim",    True,   True, None, None, {}),
+    ("product",        "Product_Dim",         True,   True, None, None, {}),
+    ("reserviceReason", "ReserviceReason_Dim", True,  True, None, None, {}),
+    
+    # Fact tables (transactional data) - Aligned with CSV
+    ("customer",       "Customer_Fact",       False, False, "dateUpdated", "dateAdded", {"includeCancellationReason": 1}),
+    ("employee",       "Employee_Fact",       False, False, "dateUpdated", None, {}),
+    ("appointment",    "Appointment_Fact",    False, False, "dateUpdated", "dateAdded", {"includeCancellationReason": 1, "includeTargetPests": 1}),
+    ("subscription",   "Subscription_Fact",   False, False, "dateUpdated", "dateAdded", {}),
+    ("route",          "Route_Fact",          False, False, "dateUpdated", "date", {}),
+    ("ticket",         "Ticket_Fact",         False, False, "dateUpdated", "dateCreated", {}),
+    ("ticketItem",     "TicketItem_Fact",     False, False, "dateUpdated", "dateCreated", {}),
+    ("payment",        "Payment_Fact",        False, False, "dateUpdated", "dateAdded", {}),
+    ("appliedPayment", "AppliedPayment_Fact", False, False, "dateUpdated", "dateApplied", {}),
+    ("note",           "Note_Fact",           False, False, "dateUpdated", "dateAdded", {}),
+    ("task",           "Task_Fact",           False, False, "dateUpdated", "dateAdded", {}),
+    ("door",           "DoorKnock_Fact",      False, False, "timeCreated", None, {}),
+    ("disbursement",   "FinancialTransaction_Fact", False, False, "dateUpdated", "dateCreated", {}),
+    ("chargeback",     "FinancialTransaction_Fact", False, False, "dateUpdated", "dateCreated", {}),
+    ("additionalContacts", "AdditionalContacts_Fact", False, False, "dateUpdated", "dateCreated", {}),
+    ("disbursementItem", "DisbursementItem_Fact", False, False, "dateUpdated", "dateCreated", {}),
+    ("genericFlagAssignment", "GenericFlagAssignment_Fact", False, False, "dateUpdated", "dateCreated", {}),
+    ("knock",          "Knock_Fact",          False, False, "dateUpdated", "dateCreated", {}),
+    ("paymentProfile", "PaymentProfile_Fact", False, False, "dateUpdated", "dateCreated", {}),
+    
+    # Legacy entities not in CSV but keeping for compatibility
+    ("appointmentReminder", "AppointmentReminder_Fact", False, False, "dateUpdated", None, {}),
+    ("flagAssignment", "FlagAssignment_Fact", False, False, "dateAdded", None, {}),
 ]
 
 # Helper functions
@@ -110,7 +122,9 @@ def fetch_entity(
     
     entity = meta["endpoint"]
     table_name = meta["table"]
-    date_field = meta["date_field"]
+    primary_date_field = meta["primary_date"]
+    secondary_date_field = meta["secondary_date"]
+    unique_params = meta.get("unique_params", {})
     is_dimension = meta["is_dim"]
     
     logger.info(f"Starting fetch for {entity} - Office {office['office_id']} ({office['office_name']})")
@@ -128,6 +142,9 @@ def fetch_entity(
         "includeData": 0
     }
     
+    # Add any unique parameters for this entity
+    params.update(unique_params)
+    
     # Convert UTC to Pacific Time for date filtering
     pacific_tz = pytz.timezone('America/Los_Angeles')
     pt_start = None
@@ -139,8 +156,8 @@ def fetch_entity(
         pt_end = window_end.astimezone(pacific_tz)
     
     # Add date filter for incremental loads
-    # Note: For customer dimension, we want to apply date filter to catch updates
-    if window_start and window_end and (not is_dimension or entity == "customer"):
+    # Apply to fact tables and entities with date fields
+    if window_start and window_end and primary_date_field:
         date_filter = {
             "operator": "BETWEEN",
             "value": [
@@ -148,8 +165,8 @@ def fetch_entity(
                 pt_end.strftime("%Y-%m-%d")
             ]
         }
-        params[date_field] = json.dumps(date_filter)
-        logger.info(f"Using date filter on {date_field}: {date_filter}")
+        params[primary_date_field] = json.dumps(date_filter)
+        logger.info(f"Using date filter on {primary_date_field}: {date_filter}")
     
     # == Step 1: Search for IDs with pagination for 50K limit ==================
     search_url = f"{base_url}/{entity}/search"
@@ -259,31 +276,16 @@ def fetch_entity(
             else:
                 break  # Stop pagination on error but keep what we have
         
-    # For certain entities, also search by their secondary date field
-    # Define which entities need secondary date searches and what field to use
-    secondary_date_fields = {
-        "customer": "dateAdded",
-        "employee": "dateAdded", 
-        "appointment": "dateAdded",
-        "subscription": "dateAdded",
-        "route": "date",  # Special case for routes
-        "ticket": "dateCreated",  # Special case for tickets
-        "ticketItem": "dateAdded",
-        "payment": "dateAdded",
-        "appliedPayment": "dateAdded",
-        "disbursement": "dateCreated",
-        "chargeback": "dateCreated"
-    }
-    
-    secondary_field = secondary_date_fields.get(entity)
-    if secondary_field and pt_start and pt_end:
-        logger.info(f"Performing additional search on {secondary_field} for {entity}")
+    # For entities with secondary date fields, perform additional search
+    if secondary_date_field and pt_start and pt_end:
+        logger.info(f"Performing additional search on {secondary_date_field} for {entity}")
         
         params_created = params.copy()
         # Remove the primary date field
-        params_created.pop(date_field, None)
+        if primary_date_field:
+            params_created.pop(primary_date_field, None)
         # Add the secondary date field
-        params_created[secondary_field] = json.dumps({
+        params_created[secondary_date_field] = json.dumps({
             "operator": "BETWEEN",
             "value": [
                 pt_start.strftime("%Y-%m-%d"),
@@ -341,7 +343,7 @@ def fetch_entity(
                             logger.error(f"Secondary search pagination not progressing!")
                             break
                         last_id = new_last_id
-                        logger.warning(f"Hit 50K limit on {secondary_field} search page {page_count}")
+                        logger.warning(f"Hit 50K limit on {secondary_date_field} search page {page_count}")
                     else:
                         break
                     
@@ -619,6 +621,104 @@ def fetch_entity(
 
 
 # =============================================================================
+# Customer Cancellation Reasons Aggregation Task
+# =============================================================================
+@task(
+    name="process_customer_cancellation_reasons",
+    description="Generate CustomerCancellationReasons fact table from customer data",
+    tags=["transform", "snowflake"]
+)
+def process_customer_cancellation_reasons(offices: List[Dict], window_end: datetime.datetime):
+    """
+    Process customer cancellation reasons from the customer entity.
+    This creates a fact table by flattening the cancellationReason array
+    and joining with the cancellationReason dimension table.
+    """
+    logger = get_run_logger()
+    logger.info("Processing customer cancellation reasons aggregation")
+    
+    try:
+        sf_connector = SnowflakeConnector.load("snowflake-altapestdb")
+        with sf_connector.get_connection() as conn:
+            cursor = conn.cursor()
+            
+            # Create the target table if it doesn't exist
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS RAW.fieldroutes.CustomerCancellationReasons_Fact (
+                    OfficeID INTEGER,
+                    CustomerID INTEGER,
+                    CancellationReasonID INTEGER,
+                    CancellationReasonDescription VARCHAR,
+                    DateCancelled TIMESTAMP_NTZ,
+                    LoadDatetimeUTC TIMESTAMP_NTZ,
+                    PRIMARY KEY (OfficeID, CustomerID, CancellationReasonID)
+                )
+            """)
+            
+            load_timestamp = window_end.strftime("%Y-%m-%d %H:%M:%S")
+            
+            for office in offices:
+                logger.info(f"Processing cancellation reasons for office {office['office_id']}")
+                
+                # Clear existing data for this office at this timestamp
+                cursor.execute("""
+                    DELETE FROM RAW.fieldroutes.CustomerCancellationReasons_Fact
+                    WHERE OfficeID = %s AND LoadDatetimeUTC = %s
+                """, (office['office_id'], load_timestamp))
+                
+                # Insert flattened cancellation reasons with dimension lookup
+                cursor.execute("""
+                    INSERT INTO RAW.fieldroutes.CustomerCancellationReasons_Fact
+                    (OfficeID, CustomerID, CancellationReasonID, CancellationReasonDescription, 
+                     DateCancelled, LoadDatetimeUTC)
+                    SELECT DISTINCT
+                        c.OfficeID,
+                        c.RawData:customerID::INTEGER as CustomerID,
+                        cr.value::INTEGER as CancellationReasonID,
+                        COALESCE(
+                            crd.RawData:description::VARCHAR,
+                            'Unknown Reason'
+                        ) as CancellationReasonDescription,
+                        c.RawData:dateCancelled::TIMESTAMP_NTZ as DateCancelled,
+                        %s as LoadDatetimeUTC
+                    FROM RAW.fieldroutes.Customer_Fact c
+                    CROSS JOIN LATERAL FLATTEN(
+                        INPUT => c.RawData:cancellationReasonIDs,
+                        OUTER => TRUE
+                    ) cr
+                    LEFT JOIN RAW.fieldroutes.CancellationReason_Dim crd
+                        ON crd.OfficeID = c.OfficeID
+                        AND crd.RawData:cancellationReasonID::INTEGER = cr.value::INTEGER
+                    WHERE c.OfficeID = %s
+                    AND c.LoadDatetimeUTC = (
+                        SELECT MAX(LoadDatetimeUTC) 
+                        FROM RAW.fieldroutes.Customer_Fact 
+                        WHERE OfficeID = %s
+                    )
+                    AND cr.value IS NOT NULL
+                    AND c.RawData:cancellationReasonIDs IS NOT NULL
+                    AND ARRAY_SIZE(c.RawData:cancellationReasonIDs) > 0
+                """, (load_timestamp, office['office_id'], office['office_id']))
+                
+                # Get count of records processed
+                cursor.execute("""
+                    SELECT COUNT(*) 
+                    FROM RAW.fieldroutes.CustomerCancellationReasons_Fact
+                    WHERE OfficeID = %s AND LoadDatetimeUTC = %s
+                """, (office['office_id'], load_timestamp))
+                
+                count = cursor.fetchone()[0]
+                logger.info(f"Created {count} cancellation reason records for office {office['office_id']}")
+            
+            conn.commit()
+            logger.info("Customer cancellation reasons processing complete")
+            
+    except Exception as e:
+        logger.error(f"Failed to process customer cancellation reasons: {str(e)}")
+        raise
+
+
+# =============================================================================
 # Schema validation task
 # =============================================================================
 @task(name="validate_snowflake_schema", tags=["validation"])
@@ -729,9 +829,17 @@ def run_fieldroutes_etl(
     
     # Filter entities if specified
     entities_to_process = [
-        {"endpoint": ep, "table": tbl, "is_dim": dim, "small": small, "date_field": df}
-        for ep, tbl, dim, small, df in ENTITY_META
-        if not entity_filter or ep in entity_filter
+        {
+            "endpoint": meta[0], 
+            "table": meta[1], 
+            "is_dim": meta[2], 
+            "small": meta[3], 
+            "primary_date": meta[4],
+            "secondary_date": meta[5] if len(meta) > 5 else None,
+            "unique_params": meta[6] if len(meta) > 6 else {}
+        }
+        for meta in ENTITY_META
+        if not entity_filter or meta[0] in entity_filter
     ]
     
     logger.info(f"Processing {len(entities_to_process)} entities for {len(offices)} offices")
@@ -760,6 +868,15 @@ def run_fieldroutes_etl(
             except Exception as e:
                 logger.error(f"❌ {meta['endpoint']} failed for office {office['office_id']}: {str(e)}")
                 failed_count += 1
+    
+    # Process customer cancellation reasons aggregation if customer entity was processed
+    if not entity_filter or "customer" in entity_filter:
+        try:
+            logger.info("Processing customer cancellation reasons aggregation")
+            process_customer_cancellation_reasons(offices, window_end or now)
+        except Exception as e:
+            logger.error(f"Failed to process customer cancellation reasons: {str(e)}")
+            failed_count += 1
     
     # Summary
     logger.info(f"""
