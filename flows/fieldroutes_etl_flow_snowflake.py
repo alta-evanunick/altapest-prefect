@@ -931,6 +931,18 @@ def run_fieldroutes_etl(
     
     if failed_count > 0:
         raise RuntimeError(f"{failed_count} tasks failed. Check logs for details.")
+    
+    # Transform raw data to analytics tables
+    logger.info("Starting transformation to analytics tables...")
+    try:
+        from transform_to_analytics_flow import transform_raw_to_analytics
+        # Run incremental transformation after successful ETL
+        transform_raw_to_analytics(incremental=True, run_quality_checks=True)
+        logger.info("Analytics transformation completed successfully")
+    except Exception as e:
+        logger.error(f"Analytics transformation failed: {str(e)}")
+        # Don't fail the entire flow if transformation fails
+        # This allows raw data to be loaded even if transformation has issues
 
 
 if __name__ == "__main__":

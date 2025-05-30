@@ -265,41 +265,61 @@ def run_cdc_fieldroutes_etl():
 if __name__ == "__main__":
     """
     Create Prefect deployments for the flows
+    Optimized for 5-deployment limit
     """
     from prefect.deployments import Deployment
     from prefect.server.schemas.schedules import CronSchedule
+    from transform_to_analytics_flow import transform_raw_to_analytics
     
-    # Create nightly deployment
+    print("Creating FieldRoutes ETL and Analytics deployments...")
+    
+    # Deployment 1: Nightly ETL (3 AM PT daily)
     nightly_deployment = Deployment.build_from_flow(
         flow=run_nightly_fieldroutes_etl,
-        name="fieldroutes-nightly-snowflake-direct",
+        name="fieldroutes-nightly-etl",
         work_queue_name="default",
-        schedule=CronSchedule(cron="0 3 * * *", timezone="America/Los_Angeles"),  # 3 AM PT daily
-        tags=["fieldroutes", "nightly", "snowflake", "direct"],
-        description="Nightly ETL from FieldRoutes API directly to Snowflake (bypassing Azure)"
+        schedule=CronSchedule(cron="0 3 * * *", timezone="America/Los_Angeles"),
+        tags=["fieldroutes", "nightly", "etl"],
+        description="Nightly ETL from FieldRoutes API to Snowflake RAW schema"
     )
     nightly_deployment.apply()
-    print("✅ Created nightly deployment: fieldroutes-nightly-snowflake-direct")
+    print("✅ [1/3] Created: fieldroutes-nightly-etl")
     
-    # Create CDC deployment
+    # Deployment 2: CDC ETL (Every 2 hours, business hours)
     cdc_deployment = Deployment.build_from_flow(
         flow=run_cdc_fieldroutes_etl,
-        name="fieldroutes-cdc-snowflake-direct",
+        name="fieldroutes-cdc-etl",
         work_queue_name="default",
-        schedule=CronSchedule(cron="0 8-18/2 * * 1-5", timezone="America/Los_Angeles"),  # Every 2 hours, 8 AM - 6 PM PT, weekdays
-        tags=["fieldroutes", "cdc", "snowflake", "direct"],
-        description="CDC ETL for high-velocity entities from FieldRoutes API directly to Snowflake"
+        schedule=CronSchedule(cron="0 8-18/2 * * 1-5", timezone="America/Los_Angeles"),
+        tags=["fieldroutes", "cdc", "etl"],
+        description="Change Data Capture ETL for high-velocity entities"
     )
     cdc_deployment.apply()
-    print("✅ Created CDC deployment: fieldroutes-cdc-snowflake-direct")
+    print("✅ [2/3] Created: fieldroutes-cdc-etl")
     
-    print("\n🎉 Deployments created successfully!")
-    print("\nTo run deployments manually:")
-    print("  prefect deployment run 'FieldRoutes_Nightly_ETL_Snowflake/fieldroutes-nightly-snowflake-direct'")
-    print("  prefect deployment run 'FieldRoutes_CDC_ETL_Snowflake/fieldroutes-cdc-snowflake-direct'")
+    # Deployment 3: Analytics Transformation (Every hour)
+    analytics_deployment = Deployment.build_from_flow(
+        flow=transform_raw_to_analytics,
+        name="raw-to-analytics-transform",
+        work_queue_name="default",
+        schedule=CronSchedule(cron="15 * * * *", timezone="America/Los_Angeles"),  # 15 minutes after the hour
+        parameters={"incremental": True, "run_quality_checks": True},
+        tags=["analytics", "transformation", "snowflake"],
+        description="Transform RAW data to ANALYTICS schema for reporting"
+    )
+    analytics_deployment.apply()
+    print("✅ [3/3] Created: raw-to-analytics-transform")
     
-    print("\nTo test with a single office/entity:")
-    print("  python -m flows.deploy_flows_snowflake")
+    print("\n🎉 All deployments created successfully!")
+    print(f"\nUsing 3 of your 5 available deployment slots")
+    print("\nSchedule Summary:")
+    print("  • Nightly ETL:     3:00 AM PT daily")
+    print("  • CDC ETL:         Every 2 hours (8 AM, 10 AM, 12 PM, 2 PM, 4 PM, 6 PM PT, weekdays)")
+    print("  • Analytics:       Every hour at :15 minutes")
     
-    # For local testing - uncomment to test with a single office/entity
-    # run_nightly_fieldroutes_etl(test_office_id=1, test_entity="customer")
+    print("\nManual execution commands:")
+    print("  prefect deployment run 'FieldRoutes_Nightly_ETL_Snowflake/fieldroutes-nightly-etl'")
+    print("  prefect deployment run 'FieldRoutes_CDC_ETL_Snowflake/fieldroutes-cdc-etl'")
+    print("  prefect deployment run 'transform-raw-to-analytics/raw-to-analytics-transform'")
+    
+    # Remove local testing line to keep it clean
