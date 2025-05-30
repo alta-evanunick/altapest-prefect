@@ -1,0 +1,315 @@
+// =====================================================
+// AR Dashboard DAX Measures for Power BI
+// Accrual-based reporting from Ticket (Invoice) level
+// =====================================================
+
+// ===== CORE AR METRICS =====
+
+// Total AR Balance
+Total AR Balance = 
+CALCULATE(
+    SUM('VW_AR_AGING'[BalanceAmount]),
+    'VW_AR_AGING'[IsCurrent] = TRUE()
+)
+
+// AR by Age Bucket
+AR 0-30 Days = 
+CALCULATE(
+    [Total AR Balance],
+    'VW_AR_AGING'[AgeBucket] = "0-30 Days"
+)
+
+AR 31-60 Days = 
+CALCULATE(
+    [Total AR Balance],
+    'VW_AR_AGING'[AgeBucket] = "31-60 Days"
+)
+
+AR 61-90 Days = 
+CALCULATE(
+    [Total AR Balance],
+    'VW_AR_AGING'[AgeBucket] = "61-90 Days"
+)
+
+AR Over 90 Days = 
+CALCULATE(
+    [Total AR Balance],
+    'VW_AR_AGING'[AgeBucket] = "Over 90 Days"
+)
+
+// AR Aging Percentage
+AR Over 90 Days % = 
+DIVIDE(
+    [AR Over 90 Days],
+    [Total AR Balance],
+    0
+)
+
+// ===== DSO METRICS =====
+
+// Days Sales Outstanding (DSO)
+DSO = 
+VAR DaysInPeriod = 30  // Adjust based on your reporting period
+VAR AverageAR = 
+    AVERAGEX(
+        DATESINPERIOD(
+            'VW_DSO_METRICS'[CalculationDate],
+            MAX('VW_DSO_METRICS'[CalculationDate]),
+            -DaysInPeriod,
+            DAY
+        ),
+        [Total AR Balance]
+    )
+VAR RevenueInPeriod = 
+    CALCULATE(
+        SUM('VW_TICKET'[TotalAmount]),
+        DATESINPERIOD(
+            'VW_TICKET'[CompletedOn],
+            MAX('VW_TICKET'[CompletedOn]),
+            -DaysInPeriod,
+            DAY
+        )
+    )
+VAR DailyRevenue = DIVIDE(RevenueInPeriod, DaysInPeriod, 0)
+RETURN
+    DIVIDE(AverageAR, DailyRevenue, 0)
+
+// DSO Trend (Change from Previous Period)
+DSO Trend = 
+VAR CurrentDSO = [DSO]
+VAR PreviousDSO = 
+    CALCULATE(
+        [DSO],
+        DATEADD('VW_DSO_METRICS'[CalculationDate], -1, MONTH)
+    )
+RETURN
+    CurrentDSO - PreviousDSO
+
+// ===== COLLECTION EFFICIENCY =====
+
+// Collection Efficiency Index (CEI)
+CEI = 
+VAR BeginningAR = 
+    CALCULATE(
+        [Total AR Balance],
+        DATEADD('VW_CEI_METRICS'[CalculationDate], -1, MONTH)
+    )
+VAR MonthlyInvoiced = 
+    CALCULATE(
+        SUM('VW_TICKET'[TotalAmount]),
+        DATEINPERIOD(
+            'VW_TICKET'[CompletedOn],
+            MAX('VW_CEI_METRICS'[CalculationDate]),
+            1,
+            MONTH
+        )
+    )
+VAR EndingTotalAR = [Total AR Balance]
+VAR EndingCurrentAR = [AR 0-30 Days]
+VAR CollectionsInPeriod = 
+    CALCULATE(
+        SUM('VW_PAYMENT'[Amount]),
+        DATEINPERIOD(
+            'VW_PAYMENT'[AppliedOn],
+            MAX('VW_CEI_METRICS'[CalculationDate]),
+            1,
+            MONTH
+        )
+    )
+RETURN
+    DIVIDE(
+        CollectionsInPeriod,
+        BeginningAR + MonthlyInvoiced - EndingCurrentAR,
+        0
+    ) * 100
+
+// Collections Rate
+Collections Rate = 
+VAR TotalInvoiced = 
+    CALCULATE(
+        SUM('VW_TICKET'[TotalAmount]),
+        ALLSELECTED('VW_TICKET')
+    )
+VAR TotalCollected = 
+    CALCULATE(
+        SUM('VW_PAYMENT'[Amount]),
+        ALLSELECTED('VW_PAYMENT')
+    )
+RETURN
+    DIVIDE(TotalCollected, TotalInvoiced, 0) * 100
+
+// ===== REVENUE METRICS (ACCRUAL-BASED) =====
+
+// Total Invoiced Revenue
+Total Invoiced Revenue = 
+SUM('VW_TICKET'[TotalAmount])
+
+// Total Collected Revenue (via AppliedPayment)
+Total Collected Revenue = 
+CALCULATE(
+    SUM('VW_APPLIED_PAYMENT'[AppliedAmount]),
+    'VW_APPLIED_PAYMENT'[IsCurrent] = TRUE()
+)
+
+// Revenue Collection Gap
+Revenue Collection Gap = 
+[Total Invoiced Revenue] - [Total Collected Revenue]
+
+// Average Invoice Value
+Average Invoice Value = 
+AVERAGE('VW_TICKET'[TotalAmount])
+
+// ===== CUSTOMER METRICS =====
+
+// Active AR Customers
+Active AR Customers = 
+CALCULATE(
+    DISTINCTCOUNT('VW_AR_AGING'[CustomerID]),
+    'VW_AR_AGING'[BalanceAmount] > 0,
+    'VW_AR_AGING'[IsCurrent] = TRUE()
+)
+
+// High Risk Customers (>90 days, >$1000)
+High Risk Customers = 
+CALCULATE(
+    DISTINCTCOUNT('VW_AR_AGING'[CustomerID]),
+    'VW_AR_AGING'[AgeBucket] = "Over 90 Days",
+    'VW_AR_AGING'[BalanceAmount] > 1000,
+    'VW_AR_AGING'[IsCurrent] = TRUE()
+)
+
+// Average Customer Balance
+Average Customer Balance = 
+DIVIDE(
+    [Total AR Balance],
+    [Active AR Customers],
+    0
+)
+
+// ===== PAYMENT BEHAVIOR =====
+
+// Average Days to Pay
+Average Days to Pay = 
+AVERAGEX(
+    'VW_PAYMENT_VELOCITY',
+    'VW_PAYMENT_VELOCITY'[DaysToPay]
+)
+
+// On-Time Payment Rate
+On Time Payment Rate = 
+VAR TotalPayments = COUNTROWS('VW_PAYMENT_VELOCITY')
+VAR OnTimePayments = 
+    CALCULATE(
+        COUNTROWS('VW_PAYMENT_VELOCITY'),
+        'VW_PAYMENT_VELOCITY'[DaysToPay] <= 30
+    )
+RETURN
+    DIVIDE(OnTimePayments, TotalPayments, 0) * 100
+
+// ===== WRITE-OFF METRICS =====
+
+// Total Write-offs
+Total Write-offs = 
+CALCULATE(
+    SUM('VW_CREDIT_MEMO'[Amount]),
+    'VW_CREDIT_MEMO'[Type] = "Write-off"
+)
+
+// Write-off Rate
+Write-off Rate = 
+DIVIDE(
+    [Total Write-offs],
+    [Total Invoiced Revenue],
+    0
+) * 100
+
+// ===== TRENDING METRICS =====
+
+// AR Balance MoM Growth
+AR Balance MoM Growth = 
+VAR CurrentMonth = [Total AR Balance]
+VAR PreviousMonth = 
+    CALCULATE(
+        [Total AR Balance],
+        DATEADD('VW_AR_AGING'[AsOfDate], -1, MONTH)
+    )
+RETURN
+    DIVIDE(
+    CurrentMonth - PreviousMonth,
+    PreviousMonth,
+    0
+) * 100
+
+// Revenue MoM Growth
+Revenue MoM Growth = 
+VAR CurrentMonth = 
+    CALCULATE(
+        [Total Invoiced Revenue],
+        DATEINPERIOD(
+            'VW_TICKET'[CompletedOn],
+            MAX('VW_TICKET'[CompletedOn]),
+            1,
+            MONTH
+        )
+    )
+VAR PreviousMonth = 
+    CALCULATE(
+        [Total Invoiced Revenue],
+        DATEADD(
+            DATEINPERIOD(
+                'VW_TICKET'[CompletedOn],
+                MAX('VW_TICKET'[CompletedOn]),
+                1,
+                MONTH
+            ),
+            -1,
+            MONTH
+        )
+    )
+RETURN
+    DIVIDE(
+        CurrentMonth - PreviousMonth,
+        PreviousMonth,
+        0
+    ) * 100
+
+// ===== OFFICE/REGION METRICS =====
+
+// AR by Office
+AR by Office = 
+CALCULATE(
+    [Total AR Balance],
+    ALLEXCEPT('VW_AR_AGING', 'VW_AR_AGING'[OfficeID])
+)
+
+// DSO by Region
+DSO by Region = 
+CALCULATE(
+    [DSO],
+    ALLEXCEPT('VW_OFFICE', 'VW_OFFICE'[RegionName])
+)
+
+// ===== FORECAST METRICS =====
+
+// Projected Collections (Next 30 Days)
+Projected Collections Next 30 Days = 
+VAR HistoricalCollectionRate = 
+    CALCULATE(
+        DIVIDE(
+            SUM('VW_PAYMENT'[Amount]),
+            [AR 0-30 Days],
+            0
+        ),
+        DATESINPERIOD(
+            'VW_PAYMENT'[AppliedOn],
+            MAX('VW_PAYMENT'[AppliedOn]),
+            -90,
+            DAY
+        )
+    )
+RETURN
+    [AR 0-30 Days] * HistoricalCollectionRate
+
+// Cash Flow Forecast
+Cash Flow Forecast = 
+[Projected Collections Next 30 Days] - [Total Write-offs]

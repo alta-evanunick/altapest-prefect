@@ -12,8 +12,8 @@ from flows.fieldroutes_etl_flow_snowflake import fetch_entity, ENTITY_META
 
 # Define high-velocity entities for CDC
 CDC_ENTITIES = [
-    "appointment", "ticket", "ticketItem", "payment", 
-    "appliedPayment", "route", "subscription"
+    "appointment", "ticket", "payment", 
+    "appliedPayment", "subscription"
 ]
 
 @flow(name="FieldRoutes_Nightly_ETL_Snowflake")

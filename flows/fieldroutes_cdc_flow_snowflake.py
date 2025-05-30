@@ -15,10 +15,9 @@ from .fieldroutes_etl_flow_snowflake import fetch_entity, ENTITY_META
 # Define which entities are "high-velocity" and need CDC
 # Updated based on FR_Entity_Matrix.csv velocity designations
 HIGH_VELOCITY_ENTITIES = {
-    "customer", "appointment", "ticket", "ticketItem", "payment", 
-    "appliedPayment", "task", "note", "knock", "route",
-    "subscription", "chargeback", "disbursementItem",
-    "appliedPayment", "genericFlagAssignment", "paymentProfile"
+    "customer", "appointment", "ticket", "payment", 
+    "appliedPayment", "task", "note", "knock",
+    "subscription", "appliedPayment"
 }
 
 @flow(
@@ -66,15 +65,15 @@ def run_cdc_fieldroutes_etl():
         if meta[0] not in HIGH_VELOCITY_ENTITIES:
             continue
             
-        # Safely unpack metadata tuple
+        # Unpack metadata tuple - all tuples have exactly 7 elements
         entity_dict = {
             "endpoint": meta[0], 
             "table": meta[1], 
             "is_dim": meta[2], 
             "small": meta[3], 
-            "primary_date": meta[4] if len(meta) > 4 else None,
-            "secondary_date": meta[5] if len(meta) > 5 else None,
-            "unique_params": meta[6] if len(meta) > 6 else {}
+            "primary_date": meta[4],
+            "secondary_date": meta[5],
+            "unique_params": meta[6]
         }
         cdc_entities.append(entity_dict)
     

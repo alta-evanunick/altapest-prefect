@@ -32,7 +32,6 @@ ENTITY_META = [
     ("customerSource", "CUSTOMERSOURCE_DIM",  True,   True, None, None, {}),  # Not in CSV, keeping legacy
     ("genericFlag",    "GENERICFLAG_DIM",     True,   True, None, None, {}),
     ("cancellationReason", "CANCELLATIONREASON_DIM", True, True, None, None, {}),
-    ("customerFlag",   "CUSTOMERFLAG_DIM",    True,   True, None, None, {}),
     ("product",        "PRODUCT_DIM",         True,   True, None, None, {}),
     ("reserviceReason", "RESERVICEREASON_DIM", True,  True, None, None, {}),
     
@@ -44,7 +43,7 @@ ENTITY_META = [
     ("route",          "ROUTE_FACT",          False, False, "dateUpdated", "date", {}),
     ("ticket",         "TICKET_FACT",         False, False, "dateUpdated", "dateCreated", {}),
     ("ticketItem",     "TICKETITEM_FACT",     False, False, "dateUpdated", "dateCreated", {}),
-    ("payment",        "PAYMENT_FACT",        False, False, "dateUpdated", "dateAdded", {}),
+    ("payment",        "PAYMENT_FACT",        False, False, "dateUpdated", "dateCreated", {}),
     ("appliedPayment", "APPLIEDPAYMENT_FACT", False, False, "dateUpdated", "dateApplied", {}),
     ("note",           "NOTE_FACT",           False, False, "dateUpdated", "dateAdded", {}),
     ("task",           "TASK_FACT",           False, False, "dateUpdated", "dateAdded", {}),
@@ -54,12 +53,11 @@ ENTITY_META = [
     ("additionalContacts", "ADDITIONALCONTACTS_FACT", False, False, "dateUpdated", "dateCreated", {}),
     ("disbursementItem", "DISBURSEMENTITEM_FACT", False, False, "dateUpdated", "dateCreated", {}),
     ("genericFlagAssignment", "GENERICFLAGASSIGNMENT_FACT", False, False, "dateUpdated", "dateCreated", {}),
-    ("knock",          "KNOCK_FACT",          False, False, "dateUpdated", "dateCreated", {}),
+    ("knock",          "KNOCK_FACT",          False, False, "dateUpdated", "dateAdded", {}),
     ("paymentProfile", "PAYMENTPROFILE_FACT", False, False, "dateUpdated", "dateCreated", {}),
     
     # Legacy entities not in CSV but keeping for compatibility
     ("appointmentReminder", "APPOINTMENTREMINDER_FACT", False, False, "dateUpdated", None, {}),
-    ("flagAssignment", "FLAGASSIGNMENT_FACT", False, False, "dateAdded", None, {}),
 ]
 
 # Helper functions
@@ -424,7 +422,6 @@ def fetch_entity(
                 "customerSource": "customerSources",
                 "genericFlag": "genericFlags",
                 "cancellationReason": "cancellationReasons",
-                "customerFlag": "customerFlags",
                 "product": "products",
                 "reserviceReason": "reserviceReasons",
                 "appointment": "appointments",
