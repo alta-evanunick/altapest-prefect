@@ -3,7 +3,6 @@ from __future__ import annotations
 FieldRoutes CDC (Change Data Capture) Flow - Direct to Snowflake Version
 Handles incremental updates for high-velocity entities during business hours
 """
-
 import datetime
 from datetime import timezone
 from typing import Dict, List

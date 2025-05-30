@@ -26,7 +26,6 @@ from prefect_snowflake import SnowflakeConnector
 # Format: (endpoint, table_name, is_dim, is_small, primary_date, secondary_date, unique_params)
 ENTITY_META = [
     # Dimension tables (reference data)
-    ("office",         "OFFICE_DIM",          True,   True, None, None, {}),
     ("region",         "REGION_DIM",          True,   True, None, None, {}),
     ("serviceType",    "SERVICETYPE_DIM",     True,   True, None, None, {}),  # Not in CSV, keeping legacy
     ("customerSource", "CUSTOMERSOURCE_DIM",  True,   True, None, None, {}),  # Not in CSV, keeping legacy
@@ -47,16 +46,14 @@ ENTITY_META = [
     ("appliedPayment", "APPLIEDPAYMENT_FACT", False, False, "dateUpdated", "dateApplied", {}),
     ("note",           "NOTE_FACT",           False, False, "dateUpdated", "dateAdded", {}),
     ("task",           "TASK_FACT",           False, False, "dateUpdated", "dateAdded", {}),
-    ("door",           "DOORKNOCK_FACT",      False, False, "timeCreated", None, {}),
-    ("disbursement",   "FINANCIALTRANSACTION_FACT", False, False, "dateUpdated", "dateCreated", {}),
-    ("chargeback",     "FINANCIALTRANSACTION_FACT", False, False, "dateUpdated", "dateCreated", {}),
+    ("door",           "DOOR_FACT",      False, False, "timeCreated", None, {}),
+    ("disbursement",   "DISBURSEMENT_FACT", False, False, "dateUpdated", "dateCreated", {}),
+    ("chargeback",     "CHARGEBACK_FACT", False, False, "dateUpdated", "dateCreated", {}),
     ("additionalContacts", "ADDITIONALCONTACTS_FACT", False, False, "dateUpdated", "dateCreated", {}),
     ("disbursementItem", "DISBURSEMENTITEM_FACT", False, False, "dateUpdated", "dateCreated", {}),
     ("genericFlagAssignment", "GENERICFLAGASSIGNMENT_FACT", False, False, "dateUpdated", "dateCreated", {}),
     ("knock",          "KNOCK_FACT",          False, False, "dateUpdated", "dateAdded", {}),
     ("paymentProfile", "PAYMENTPROFILE_FACT", False, False, "dateUpdated", "dateCreated", {}),
-    
-    # Legacy entities not in CSV but keeping for compatibility
     ("appointmentReminder", "APPOINTMENTREMINDER_FACT", False, False, "dateUpdated", None, {}),
 ]
 
@@ -143,8 +140,7 @@ def fetch_entity(
     
     # Build query parameters
     params = {
-        "officeIDs": office["office_id"],
-        "includeData": 0
+        "officeIDs": office["office_id"]
     }
     
     # Add any unique parameters for this entity
@@ -205,13 +201,15 @@ def fetch_entity(
         if last_id is not None:
             # Get the primary key field name from entity metadata
             pk_field = {
-                "customer": "customerID",
-                "employee": "employeeID", 
-                "office": "officeID",
                 "region": "regionID",
                 "serviceType": "serviceTypeID",
                 "customerSource": "customerSourceID",
                 "genericFlag": "genericFlagID",
+                "cancellationReason": "cancellationReasonID",
+                "product": "productID",
+                "reserviceReason": "reserviceReasonID",
+                "customer": "customerID",
+                "employee": "employeeID",
                 "appointment": "appointmentID",
                 "subscription": "subscriptionID",
                 "route": "routeID",
@@ -221,11 +219,16 @@ def fetch_entity(
                 "appliedPayment": "appliedPaymentID",
                 "note": "noteID",
                 "task": "taskID",
-                "appointmentReminder": "appointmentReminderID",
                 "door": "doorID",
-                "disbursement": "disbursementID",
-                "chargeback": "chargebackID",
-                "flagAssignment": "flagAssignmentID"
+                "disbursement": "gatewayDisbursementID",
+                "chargeback": "gatewayChargebackID",
+                "additionalContacts": "additionalContactID",
+                "disbursementItem": "gatewayDisbursementEntryID",
+                "genericFlagAssignment": "genericFlagAssignmentID",
+                "knock": "knockID",
+                "paymentProfile": "paymentProfileID", 
+                "office": "officeID",
+                "appointmentReminder": "appointmentReminderID"
             }.get(entity, f"{entity}ID")
             
             current_params[pk_field] = json.dumps({
@@ -414,9 +417,6 @@ def fetch_entity(
             
             # First try the plural entity name
             plural_map = {
-                "customer": "customers",
-                "employee": "employees",
-                "office": "offices",
                 "region": "regions",
                 "serviceType": "serviceTypes",
                 "customerSource": "customerSources",
@@ -424,6 +424,9 @@ def fetch_entity(
                 "cancellationReason": "cancellationReasons",
                 "product": "products",
                 "reserviceReason": "reserviceReasons",
+                "customer": "customers",
+                "employee": "employees",
+                "office": "offices",
                 "appointment": "appointments",
                 "subscription": "subscriptions",
                 "route": "routes",
@@ -433,7 +436,6 @@ def fetch_entity(
                 "appliedPayment": "appliedPayments",
                 "note": "notes",
                 "task": "tasks",
-                "appointmentReminder": "appointmentReminders",
                 "door": "doors",
                 "disbursement": "disbursements",
                 "chargeback": "chargebacks",
@@ -442,7 +444,7 @@ def fetch_entity(
                 "genericFlagAssignment": "genericFlagAssignments",
                 "knock": "knocks",
                 "paymentProfile": "paymentProfiles",
-                "flagAssignment": "flagAssignments"
+                "appointmentReminder": "appointmentReminders"
             }
             
             plural_name = plural_map.get(entity, entity + "s")
@@ -489,19 +491,10 @@ def fetch_entity(
         # Keep records as Python objects for Snowflake to handle
         data_rows = []
         for record in all_records:
-            # For financial transactions, add the transaction type
-            if entity in ["disbursement", "chargeback"]:
-                data_rows.append((
-                    office["office_id"],
-                    load_timestamp,
-                    json.dumps(record),  # JSON string
-                    entity  # transaction_type
-                ))
-            else:
-                data_rows.append((
-                    office["office_id"],
-                    load_timestamp,
-                    json.dumps(record)  # JSON string
+            data_rows.append((
+                office["office_id"],
+                load_timestamp,
+                json.dumps(record)  # JSON string
                 ))
         
         # Bulk insert using Snowflake's executemany
@@ -525,7 +518,7 @@ def fetch_entity(
                     OfficeID INTEGER,
                     LoadDatetimeUTC TIMESTAMP_NTZ,
                     RawDataString VARCHAR
-                    {", TransactionType VARCHAR" if entity in ["disbursement", "chargeback"] else ""}
+                    {", TransactionType VARCHAR"}
                 )
             """)
             
@@ -536,14 +529,7 @@ def fetch_entity(
             """, (office["office_id"],))
             
             # Prepare insert SQL based on entity type
-            if entity in ["disbursement", "chargeback"]:
-                insert_sql = f"""
-                    INSERT INTO RAW_DB.FIELDROUTES.{staging_table} 
-                    (OfficeID, LoadDatetimeUTC, RawDataString, TransactionType)
-                    VALUES (%s, %s, %s, %s)
-                """
-            else:
-                insert_sql = f"""
+            if  insert_sql = f"""
                     INSERT INTO RAW_DB.FIELDROUTES.{staging_table} 
                     (OfficeID, LoadDatetimeUTC, RawDataString)
                     VALUES (%s, %s, %s)
@@ -560,21 +546,7 @@ def fetch_entity(
                 logger.info(f"Staged batch {i//batch_size + 1}: {total_staged}/{len(data_rows)} records")
             
             # Now move from staging to final table with TRY_PARSE_JSON
-            if entity in ["disbursement", "chargeback"]:
-                cursor.execute(f"""
-                    INSERT INTO RAW_DB.FIELDROUTES.{table_name} 
-                    (OfficeID, LoadDatetimeUTC, RawData, TransactionType)
-                    SELECT 
-                        OfficeID,
-                        LoadDatetimeUTC,
-                        TRY_PARSE_JSON(RawDataString),
-                        TransactionType
-                    FROM RAW_DB.FIELDROUTES.{staging_table}
-                    WHERE OfficeID = %s
-                    AND TRY_PARSE_JSON(RawDataString) IS NOT NULL
-                """, (office["office_id"],))
-            else:
-                cursor.execute(f"""
+            if  cursor.execute(f"""
                     INSERT INTO RAW_DB.FIELDROUTES.{table_name} 
                     (OfficeID, LoadDatetimeUTC, RawData)
                     SELECT 
