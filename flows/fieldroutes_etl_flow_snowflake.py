@@ -165,13 +165,29 @@ def fetch_entity(
     # Add date filter for incremental loads
     # Apply to fact tables and entities with date fields
     if window_start and window_end and primary_date_field:
-        date_filter = {
-            "operator": "BETWEEN",
-            "value": [
-                pt_start.strftime("%Y-%m-%d"),
-                pt_end.strftime("%Y-%m-%d")
-            ]
-        }
+        # For CDC, we need timestamps, not just dates
+        # Check if this is a CDC run (window is less than 24 hours)
+        is_cdc = (window_end - window_start).total_seconds() < 86400  # Less than 24 hours
+        
+        if is_cdc:
+            # Use full timestamp format for CDC
+            date_filter = {
+                "operator": "BETWEEN",
+                "value": [
+                    pt_start.strftime("%Y-%m-%d %H:%M:%S"),
+                    pt_end.strftime("%Y-%m-%d %H:%M:%S")
+                ]
+            }
+        else:
+            # Use date-only format for nightly runs
+            date_filter = {
+                "operator": "BETWEEN",
+                "value": [
+                    pt_start.strftime("%Y-%m-%d"),
+                    pt_end.strftime("%Y-%m-%d")
+                ]
+            }
+        
         params[primary_date_field] = json.dumps(date_filter)
         logger.info(f"Using date filter on {primary_date_field}: {date_filter}")
     
@@ -292,11 +308,17 @@ def fetch_entity(
         if primary_date_field:
             params_created.pop(primary_date_field, None)
         # Add the secondary date field
+        # Use the same date/timestamp format as primary date field
+        if is_cdc:
+            date_format = "%Y-%m-%d %H:%M:%S"
+        else:
+            date_format = "%Y-%m-%d"
+            
         params_created[secondary_date_field] = json.dumps({
             "operator": "BETWEEN",
             "value": [
-                pt_start.strftime("%Y-%m-%d"),
-                pt_end.strftime("%Y-%m-%d")
+                pt_start.strftime(date_format),
+                pt_end.strftime(date_format)
             ]
         })
         
