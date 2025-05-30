@@ -1,18 +1,53 @@
-# RAW → ANALYTICS Implementation Checklist
+# RAW → STAGING → PRODUCTION Implementation Checklist
 
 ## Pre-Implementation Requirements ✅
 - [x] Snowflake connection established
-- [x] RAW schema with data populated
+- [x] Existing data in ALTAPEST_DB (to be migrated)
 - [x] Prefect environment configured
 - [x] Power BI Desktop connected to Snowflake
 
-## Phase 1: Deploy New Flows (Required)
+## Phase 1: Database Migration (Required First)
 
-### 1. Update Prefect Deployments
+### 1. Run Migration Script
+```sql
+-- Run migrate_to_new_structure.sql in Snowflake
+-- This creates new databases and migrates existing data
+-- Run section by section, verifying each step
+```
+
+### 2. Verify Migration
+```sql
+-- Check new database structure
+SHOW DATABASES LIKE '%_DB';
+
+-- Verify schemas
+USE DATABASE RAW_DB;
+SHOW SCHEMAS;
+
+USE DATABASE STAGING_DB;
+SHOW SCHEMAS;
+
+USE DATABASE PRODUCTION_DB;
+SHOW SCHEMAS;
+
+-- Verify data migrated
+SELECT 'RAW_DB' as DB, COUNT(*) as Tables 
+FROM RAW_DB.INFORMATION_SCHEMA.TABLES 
+WHERE TABLE_SCHEMA = 'FIELDROUTES'
+UNION ALL
+SELECT 'STAGING_DB', COUNT(*) 
+FROM STAGING_DB.INFORMATION_SCHEMA.TABLES 
+WHERE TABLE_SCHEMA = 'FIELDROUTES';
+```
+
+## Phase 2: Deploy Updated Flows
+
+### 3. Update Prefect Deployments
 ```bash
 # Remove old deployments first (if any exist)
 prefect deployment delete "FieldRoutes_Nightly_ETL/fieldroutes-nightly-snowflake-direct" --yes
 prefect deployment delete "FieldRoutes_CDC_ETL/fieldroutes-cdc-snowflake-direct" --yes
+prefect deployment delete "transform-raw-to-analytics/raw-to-analytics-transform" --yes
 
 # Deploy updated flows (3 deployments total)
 cd /mnt/c/Users/evanu/Documents/ETC\ Solutions/OctaneInsights/Prefect/altapest-prefect
@@ -23,70 +58,57 @@ python flows/deploy_flows_snowflake.py
 ```
 ✅ [1/3] Created: fieldroutes-nightly-etl
 ✅ [2/3] Created: fieldroutes-cdc-etl  
-✅ [3/3] Created: raw-to-analytics-transform
+✅ [3/3] Created: raw-to-staging-transform
 Using 3 of your 5 available deployment slots
 ```
 
-### 2. Create ANALYTICS Schema
-```sql
--- Run in Snowflake
-USE DATABASE ALTAPEST_DB;
-CREATE SCHEMA IF NOT EXISTS ANALYTICS;
-GRANT USAGE ON SCHEMA ANALYTICS TO ROLE ACCOUNTADMIN;
-GRANT ALL ON SCHEMA ANALYTICS TO ROLE ACCOUNTADMIN;
-```
+## Phase 3: Initial Data Load
 
-## Phase 2: First-Time Setup (Run Once)
-
-### 3. Initial Full Transformation
+### 4. Run Full Transformation
 ```bash
-# Run manual full transformation to populate ANALYTICS tables
-prefect deployment run 'transform-raw-to-analytics/raw-to-analytics-transform' \
+# Run manual full transformation to populate STAGING_DB.FIELDROUTES tables
+prefect deployment run 'transform-raw-to-staging/raw-to-staging-transform' \
   --param incremental=false \
   --param run_quality_checks=true
 ```
 
 **Verify Success:**
 ```sql
--- Check if ANALYTICS tables were created
-SHOW TABLES IN ANALYTICS;
+-- Check if STAGING_DB.FIELDROUTES tables were created
+SHOW TABLES IN STAGING_DB.FIELDROUTES;
 
 -- Verify data counts
-SELECT 'DIM_OFFICE' as TableName, COUNT(*) as RecordCount FROM ANALYTICS.DIM_OFFICE
+SELECT 'DIM_OFFICE' as TableName, COUNT(*) as RecordCount FROM STAGING_DB.FIELDROUTES.DIM_OFFICE
 UNION ALL
-SELECT 'FACT_CUSTOMER', COUNT(*) FROM ANALYTICS.FACT_CUSTOMER  
+SELECT 'FACT_CUSTOMER', COUNT(*) FROM STAGING_DB.FIELDROUTES.FACT_CUSTOMER  
 UNION ALL
-SELECT 'FACT_TICKET', COUNT(*) FROM ANALYTICS.FACT_TICKET
+SELECT 'FACT_TICKET', COUNT(*) FROM STAGING_DB.FIELDROUTES.FACT_TICKET
 UNION ALL
-SELECT 'FACT_PAYMENT', COUNT(*) FROM ANALYTICS.FACT_PAYMENT
+SELECT 'FACT_PAYMENT', COUNT(*) FROM STAGING_DB.FIELDROUTES.FACT_PAYMENT
 UNION ALL
-SELECT 'FACT_APPLIED_PAYMENT', COUNT(*) FROM ANALYTICS.FACT_APPLIED_PAYMENT;
+SELECT 'FACT_APPLIED_PAYMENT', COUNT(*) FROM STAGING_DB.FIELDROUTES.FACT_APPLIED_PAYMENT;
 ```
 
-### 4. Update Reporting Views (If Not Already Done)
+### 5. Create Production Views
 ```sql
--- Run the updated reporting views script
--- This should point to ANALYTICS schema instead of RAW
--- File: /sql/create_reporting_views_v3.sql (needs to be created)
+-- Run the production reporting views script
+-- This creates all views in PRODUCTION_DB.FIELDROUTES
+-- File: /sql/create_reporting_views_production.sql
+
+USE DATABASE PRODUCTION_DB;
+-- Then run the entire script
 ```
 
-**Create Updated Views Script:**
-```sql
--- Example update needed in views:
--- OLD: FROM RAW.fieldroutes.CUSTOMER_FACT
--- NEW: FROM ANALYTICS.FACT_CUSTOMER
-```
+## Phase 4: Validation & Testing
 
-## Phase 3: Validation & Testing
-
-### 5. Data Quality Validation
+### 6. Data Quality Validation
 ```sql
 -- Check for data quality issues
 SELECT 
     'Orphaned Tickets' as Issue,
     COUNT(*) as Count
-FROM ANALYTICS.FACT_TICKET t
-LEFT JOIN ANALYTICS.FACT_CUSTOMER c ON t.CustomerID = c.CustomerID
+FROM STAGING_DB.FIELDROUTES.FACT_TICKET t
+LEFT JOIN STAGING_DB.FIELDROUTES.FACT_CUSTOMER c ON t.CustomerID = c.CustomerID
 WHERE c.CustomerID IS NULL
 
 UNION ALL
@@ -94,8 +116,8 @@ UNION ALL
 SELECT 
     'Unlinked Applied Payments',
     COUNT(*)
-FROM ANALYTICS.FACT_APPLIED_PAYMENT ap
-LEFT JOIN ANALYTICS.FACT_TICKET t ON ap.TicketID = t.TicketID
+FROM STAGING_DB.FIELDROUTES.FACT_APPLIED_PAYMENT ap
+LEFT JOIN STAGING_DB.FIELDROUTES.FACT_TICKET t ON ap.TicketID = t.TicketID
 WHERE t.TicketID IS NULL
 
 UNION ALL
@@ -103,7 +125,7 @@ UNION ALL
 SELECT 
     'Negative Customer Balances',
     COUNT(*)
-FROM ANALYTICS.FACT_CUSTOMER
+FROM STAGING_DB.FIELDROUTES.FACT_CUSTOMER
 WHERE Balance < 0
 
 UNION ALL
@@ -111,13 +133,16 @@ UNION ALL
 SELECT 
     'Future Dated Tickets',
     COUNT(*)
-FROM ANALYTICS.FACT_TICKET
+FROM STAGING_DB.FIELDROUTES.FACT_TICKET
 WHERE CompletedOn > CURRENT_TIMESTAMP();
 ```
 
-### 6. Test Power BI Connection
+### 7. Test Power BI Connection
 ```sql
 -- Test key views that Power BI will use
+USE DATABASE PRODUCTION_DB;
+USE SCHEMA FIELDROUTES;
+
 SELECT TOP 100 * FROM VW_AR_AGING;
 SELECT TOP 100 * FROM VW_CUSTOMER;
 SELECT TOP 100 * FROM VW_TICKET;
@@ -125,7 +150,7 @@ SELECT TOP 100 * FROM VW_PAYMENT;
 SELECT TOP 100 * FROM VW_APPLIED_PAYMENT;
 ```
 
-### 7. Performance Testing
+### 8. Performance Testing
 ```sql
 -- Test query performance for Power BI
 SELECT 
@@ -145,28 +170,28 @@ WHERE IsCurrent = TRUE
 GROUP BY AgeBucket;
 ```
 
-## Phase 4: Monitoring Setup
+## Phase 5: Monitoring Setup
 
-### 8. Schedule Monitoring Queries
+### 9. Schedule Monitoring Queries
 ```sql
 -- Create monitoring view
-CREATE OR REPLACE VIEW ANALYTICS.VW_PIPELINE_STATUS AS
+CREATE OR REPLACE VIEW STAGING_DB.FIELDROUTES.VW_PIPELINE_STATUS AS
 SELECT 
     'RAW_CUSTOMER' as TableName,
     COUNT(*) as RecordCount,
     MAX(LoadDatetimeUTC) as LastUpdate,
     DATEDIFF(hour, MAX(LoadDatetimeUTC), CURRENT_TIMESTAMP()) as HoursSinceUpdate
-FROM RAW.fieldroutes.CUSTOMER_FACT
+FROM RAW_DB.FIELDROUTES.CUSTOMER_FACT
 UNION ALL
 SELECT 
-    'ANALYTICS_CUSTOMER',
+    'STAGING_DB.FIELDROUTES_CUSTOMER',
     COUNT(*),
     MAX(LoadDatetimeUTC),
     DATEDIFF(hour, MAX(LoadDatetimeUTC), CURRENT_TIMESTAMP())
-FROM ANALYTICS.FACT_CUSTOMER;
+FROM STAGING_DB.FIELDROUTES.FACT_CUSTOMER;
 ```
 
-### 9. Set Up Alerts (Optional)
+### 10. Set Up Alerts (Optional)
 ```python
 # Add to transform_to_analytics_flow.py if needed
 @task
@@ -175,7 +200,7 @@ def check_pipeline_health(snowflake: SnowflakeConnector):
         cursor = conn.cursor()
         cursor.execute("""
             SELECT TableName, HoursSinceUpdate 
-            FROM ANALYTICS.VW_PIPELINE_STATUS 
+            FROM STAGING_DB.FIELDROUTES.VW_PIPELINE_STATUS 
             WHERE HoursSinceUpdate > 25
         """)
         stale_tables = cursor.fetchall()
@@ -185,36 +210,36 @@ def check_pipeline_health(snowflake: SnowflakeConnector):
             # Could send email/Slack alert here
 ```
 
-## Phase 5: Power BI Integration
+## Phase 6: Power BI Integration
 
-### 10. Update Power BI Data Sources
+### 11. Update Power BI Data Sources
 1. **Open Power BI Desktop**
 2. **Transform Data → Data source settings**
 3. **Update connection** to use new views if needed
 4. **Refresh data** to test new schema
 
-### 11. Deploy DAX Measures
+### 12. Deploy DAX Measures
 1. **Copy measures** from `/dax/AR_Dashboard_Measures.dax`
 2. **Create new measures** in Power BI
 3. **Test calculations** against known data
 4. **Create initial dashboard** using new measures
 
-### 12. Performance Optimization
+### 13. Performance Optimization
 ```sql
 -- Add clustering if performance is slow
-ALTER TABLE ANALYTICS.FACT_TICKET 
+ALTER TABLE STAGING_DB.FIELDROUTES.FACT_TICKET 
 CLUSTER BY (CompletedOn, CustomerID);
 
-ALTER TABLE ANALYTICS.FACT_CUSTOMER 
+ALTER TABLE STAGING_DB.FIELDROUTES.FACT_CUSTOMER 
 CLUSTER BY (OfficeID, CustomerID);
 
 -- Consider materialized views for complex calculations
-CREATE OR REPLACE VIEW ANALYTICS.VW_AR_SUMMARY_MATERIALIZED AS
+CREATE OR REPLACE VIEW STAGING_DB.FIELDROUTES.VW_AR_SUMMARY_MATERIALIZED AS
 SELECT 
     CustomerID,
     SUM(Balance) as TotalBalance,
     DATEDIFF(day, MIN(CompletedOn), CURRENT_DATE()) as OldestInvoiceAge
-FROM ANALYTICS.FACT_TICKET
+FROM STAGING_DB.FIELDROUTES.FACT_TICKET
 WHERE Balance > 0
 GROUP BY CustomerID;
 ```
@@ -225,35 +250,35 @@ GROUP BY CustomerID;
 
 #### 1. "Table doesn't exist" errors
 ```sql
--- Check if ANALYTICS schema exists
-SHOW SCHEMAS IN DATABASE ALTAPEST_DB;
+-- Check if STAGING_DB.FIELDROUTES schema exists
+SHOW SCHEMAS IN DATABASE STAGING_DB;
 
 -- Re-run transformation
-prefect deployment run 'transform-raw-to-analytics/raw-to-analytics-transform' --param incremental=false
+prefect deployment run 'transform-raw-to-staging/raw-to-staging-transform' --param incremental=false
 ```
 
-#### 2. Zero records in ANALYTICS tables
+#### 2. Zero records in STAGING_DB.FIELDROUTES tables
 ```sql
 -- Check RAW data exists
-SELECT COUNT(*) FROM RAW.fieldroutes.CUSTOMER_FACT;
+SELECT COUNT(*) FROM RAW_DB.FIELDROUTES.CUSTOMER_FACT;
 
 -- Check LoadDatetimeUTC distribution
 SELECT 
     DATE(LoadDatetimeUTC) as LoadDate,
     COUNT(*) as RecordCount
-FROM RAW.fieldroutes.CUSTOMER_FACT
+FROM RAW_DB.FIELDROUTES.CUSTOMER_FACT
 GROUP BY DATE(LoadDatetimeUTC)
 ORDER BY LoadDate DESC;
 ```
 
 #### 3. Power BI connection issues
-- Verify user has SELECT permissions on all ANALYTICS tables
-- Check that views reference ANALYTICS schema correctly
+- Verify user has SELECT permissions on all STAGING_DB.FIELDROUTES tables
+- Check that views reference STAGING_DB.FIELDROUTES schema correctly
 - Test connection with simple query first
 
 #### 4. Performance issues
 - Check warehouse size (may need to scale up temporarily)
-- Verify clustering is working: `SHOW TABLES LIKE 'FACT_%' IN ANALYTICS;`
+- Verify clustering is working: `SHOW TABLES LIKE 'FACT_%' IN STAGING_DB.FIELDROUTES;`
 - Consider materializing frequently-used views
 
 ## Success Criteria
@@ -263,7 +288,7 @@ ORDER BY LoadDate DESC;
 - No old deployments consuming slots
 
 ✅ **Phase 2 Complete When:**
-- ANALYTICS schema exists with all tables
+- STAGING_DB.FIELDROUTES schema exists with all tables
 - Initial transformation runs successfully
 - Data quality checks pass
 

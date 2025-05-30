@@ -36,8 +36,8 @@ def run_nightly_fieldroutes_etl(
             SELECT o.office_id, o.office_name, o.base_url,
                    o.secret_block_name_key, o.secret_block_name_token,
                    w.entity_name, w.last_run_utc
-            FROM   RAW.REF.offices_lookup o
-            JOIN   RAW.REF.office_entity_watermark w USING (office_id)
+            FROM   RAW_DB.REF.offices_lookup o
+            JOIN   RAW_DB.REF.office_entity_watermark w USING (office_id)
             WHERE  o.active = TRUE
             ORDER BY o.office_id;
         """)
@@ -157,8 +157,8 @@ def run_cdc_fieldroutes_etl():
             SELECT o.office_id, o.office_name, o.base_url,
                    o.secret_block_name_key, o.secret_block_name_token,
                    w.entity_name, w.last_run_utc
-            FROM   RAW.REF.offices_lookup o
-            JOIN   RAW.REF.office_entity_watermark w USING (office_id)
+            FROM   RAW_DB.REF.offices_lookup o
+            JOIN   RAW_DB.REF.office_entity_watermark w USING (office_id)
             WHERE  o.active = TRUE
               AND  w.entity_name IN ({})
             ORDER BY o.office_id
@@ -269,9 +269,9 @@ if __name__ == "__main__":
     """
     from prefect.deployments import Deployment
     from prefect.server.schemas.schedules import CronSchedule
-    from transform_to_analytics_flow import transform_raw_to_analytics
+    from transform_to_analytics_flow import transform_raw_to_staging
     
-    print("Creating FieldRoutes ETL and Analytics deployments...")
+    print("Creating FieldRoutes ETL and Staging deployments...")
     
     # Deployment 1: Nightly ETL (3 AM PT daily)
     nightly_deployment = Deployment.build_from_flow(
@@ -280,7 +280,7 @@ if __name__ == "__main__":
         work_queue_name="default",
         schedule=CronSchedule(cron="0 3 * * *", timezone="America/Los_Angeles"),
         tags=["fieldroutes", "nightly", "etl"],
-        description="Nightly ETL from FieldRoutes API to Snowflake RAW schema"
+        description="Nightly ETL from FieldRoutes API to RAW_DB.FIELDROUTES"
     )
     nightly_deployment.apply()
     print("✅ [1/3] Created: fieldroutes-nightly-etl")
@@ -297,29 +297,29 @@ if __name__ == "__main__":
     cdc_deployment.apply()
     print("✅ [2/3] Created: fieldroutes-cdc-etl")
     
-    # Deployment 3: Analytics Transformation (Every hour)
-    analytics_deployment = Deployment.build_from_flow(
-        flow=transform_raw_to_analytics,
-        name="raw-to-analytics-transform",
+    # Deployment 3: Staging Transformation (Every hour)
+    staging_deployment = Deployment.build_from_flow(
+        flow=transform_raw_to_staging,
+        name="raw-to-staging-transform",
         work_queue_name="default",
         schedule=CronSchedule(cron="15 * * * *", timezone="America/Los_Angeles"),  # 15 minutes after the hour
         parameters={"incremental": True, "run_quality_checks": True},
-        tags=["analytics", "transformation", "snowflake"],
-        description="Transform RAW data to ANALYTICS schema for reporting"
+        tags=["staging", "transformation", "snowflake"],
+        description="Transform RAW_DB data to STAGING_DB.FIELDROUTES for analytics"
     )
-    analytics_deployment.apply()
-    print("✅ [3/3] Created: raw-to-analytics-transform")
+    staging_deployment.apply()
+    print("✅ [3/3] Created: raw-to-staging-transform")
     
     print("\n🎉 All deployments created successfully!")
     print(f"\nUsing 3 of your 5 available deployment slots")
     print("\nSchedule Summary:")
     print("  • Nightly ETL:     3:00 AM PT daily")
     print("  • CDC ETL:         Every 2 hours (8 AM, 10 AM, 12 PM, 2 PM, 4 PM, 6 PM PT, weekdays)")
-    print("  • Analytics:       Every hour at :15 minutes")
+    print("  • Staging:         Every hour at :15 minutes")
     
     print("\nManual execution commands:")
     print("  prefect deployment run 'FieldRoutes_Nightly_ETL_Snowflake/fieldroutes-nightly-etl'")
     print("  prefect deployment run 'FieldRoutes_CDC_ETL_Snowflake/fieldroutes-cdc-etl'")
-    print("  prefect deployment run 'transform-raw-to-analytics/raw-to-analytics-transform'")
+    print("  prefect deployment run 'transform-raw-to-staging/raw-to-staging-transform'")
     
     # Remove local testing line to keep it clean

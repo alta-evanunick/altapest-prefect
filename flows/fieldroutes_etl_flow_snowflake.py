@@ -511,7 +511,7 @@ def fetch_entity(
             # Clear any existing data for this office/entity/timestamp to prevent duplicates
             logger.info(f"Clearing existing data for office {office['office_id']} at timestamp {load_timestamp}")
             cursor.execute(f"""
-                DELETE FROM RAW.fieldroutes.{table_name}
+                DELETE FROM RAW_DB.FIELDROUTES.{table_name}
                 WHERE OfficeID = %s AND LoadDatetimeUTC = %s
             """, (office["office_id"], load_timestamp))
             
@@ -521,7 +521,7 @@ def fetch_entity(
             # Create staging table if not exists
             staging_table = f"{table_name}_staging"
             cursor.execute(f"""
-                CREATE TABLE IF NOT EXISTS RAW.fieldroutes.{staging_table} (
+                CREATE TABLE IF NOT EXISTS RAW_DB.FIELDROUTES.{staging_table} (
                     OfficeID INTEGER,
                     LoadDatetimeUTC TIMESTAMP_NTZ,
                     RawDataString VARCHAR
@@ -531,20 +531,20 @@ def fetch_entity(
             
             # Clear staging table for this office
             cursor.execute(f"""
-                DELETE FROM RAW.fieldroutes.{staging_table} 
+                DELETE FROM RAW_DB.FIELDROUTES.{staging_table} 
                 WHERE OfficeID = %s
             """, (office["office_id"],))
             
             # Prepare insert SQL based on entity type
             if entity in ["disbursement", "chargeback"]:
                 insert_sql = f"""
-                    INSERT INTO RAW.fieldroutes.{staging_table} 
+                    INSERT INTO RAW_DB.FIELDROUTES.{staging_table} 
                     (OfficeID, LoadDatetimeUTC, RawDataString, TransactionType)
                     VALUES (%s, %s, %s, %s)
                 """
             else:
                 insert_sql = f"""
-                    INSERT INTO RAW.fieldroutes.{staging_table} 
+                    INSERT INTO RAW_DB.FIELDROUTES.{staging_table} 
                     (OfficeID, LoadDatetimeUTC, RawDataString)
                     VALUES (%s, %s, %s)
                 """
@@ -562,26 +562,26 @@ def fetch_entity(
             # Now move from staging to final table with TRY_PARSE_JSON
             if entity in ["disbursement", "chargeback"]:
                 cursor.execute(f"""
-                    INSERT INTO RAW.fieldroutes.{table_name} 
+                    INSERT INTO RAW_DB.FIELDROUTES.{table_name} 
                     (OfficeID, LoadDatetimeUTC, RawData, TransactionType)
                     SELECT 
                         OfficeID,
                         LoadDatetimeUTC,
                         TRY_PARSE_JSON(RawDataString),
                         TransactionType
-                    FROM RAW.fieldroutes.{staging_table}
+                    FROM RAW_DB.FIELDROUTES.{staging_table}
                     WHERE OfficeID = %s
                     AND TRY_PARSE_JSON(RawDataString) IS NOT NULL
                 """, (office["office_id"],))
             else:
                 cursor.execute(f"""
-                    INSERT INTO RAW.fieldroutes.{table_name} 
+                    INSERT INTO RAW_DB.FIELDROUTES.{table_name} 
                     (OfficeID, LoadDatetimeUTC, RawData)
                     SELECT 
                         OfficeID,
                         LoadDatetimeUTC,
                         TRY_PARSE_JSON(RawDataString)
-                    FROM RAW.fieldroutes.{staging_table}
+                    FROM RAW_DB.FIELDROUTES.{staging_table}
                     WHERE OfficeID = %s
                     AND TRY_PARSE_JSON(RawDataString) IS NOT NULL
                 """, (office["office_id"],))
@@ -589,7 +589,7 @@ def fetch_entity(
             # Get count of successful inserts
             cursor.execute(f"""
                 SELECT COUNT(*) 
-                FROM RAW.fieldroutes.{staging_table}
+                FROM RAW_DB.FIELDROUTES.{staging_table}
                 WHERE OfficeID = %s
                 AND TRY_PARSE_JSON(RawDataString) IS NULL
             """, (office["office_id"],))
@@ -601,7 +601,7 @@ def fetch_entity(
                 # Log a sample of failed records for debugging
                 cursor.execute(f"""
                     SELECT LEFT(RawDataString, 200) 
-                    FROM RAW.fieldroutes.{staging_table}
+                    FROM RAW_DB.FIELDROUTES.{staging_table}
                     WHERE OfficeID = %s
                     AND TRY_PARSE_JSON(RawDataString) IS NULL
                     LIMIT 5
@@ -613,7 +613,7 @@ def fetch_entity(
             
             # Clean up staging table
             cursor.execute(f"""
-                DELETE FROM RAW.fieldroutes.{staging_table} 
+                DELETE FROM RAW_DB.FIELDROUTES.{staging_table} 
                 WHERE OfficeID = %s
             """, (office["office_id"],))
             
@@ -622,7 +622,7 @@ def fetch_entity(
             
             # Update watermark
             cursor.execute("""
-                UPDATE RAW.REF.office_entity_watermark 
+                UPDATE RAW_DB.REF.office_entity_watermark 
                 SET last_run_utc = %s, 
                     records_loaded = %s,
                     last_success_utc = CURRENT_TIMESTAMP(),
@@ -643,7 +643,7 @@ def fetch_entity(
             with sf_connector.get_connection() as conn:
                 cursor = conn.cursor()
                 cursor.execute("""
-                    UPDATE RAW.REF.office_entity_watermark 
+                    UPDATE RAW_DB.REF.office_entity_watermark 
                     SET error_count = error_count + 1,
                         last_run_utc = %s
                     WHERE office_id = %s AND entity_name = %s
@@ -679,7 +679,7 @@ def process_customer_cancellation_reasons(offices: List[Dict], window_end: datet
             
             # Create the target table if it doesn't exist
             cursor.execute("""
-                CREATE TABLE IF NOT EXISTS RAW.fieldroutes.CUSTOMERCANCELLATIONREASONS_FACT (
+                CREATE TABLE IF NOT EXISTS RAW_DB.FIELDROUTES.CUSTOMERCANCELLATIONREASONS_FACT (
                     OfficeID INTEGER,
                     CustomerID INTEGER,
                     CancellationReasonID INTEGER,
@@ -697,13 +697,13 @@ def process_customer_cancellation_reasons(offices: List[Dict], window_end: datet
                 
                 # Clear existing data for this office at this timestamp
                 cursor.execute("""
-                    DELETE FROM RAW.fieldroutes.CUSTOMERCANCELLATIONREASONS_FACT
+                    DELETE FROM RAW_DB.FIELDROUTES.CUSTOMERCANCELLATIONREASONS_FACT
                     WHERE OfficeID = %s AND LoadDatetimeUTC = %s
                 """, (office['office_id'], load_timestamp))
                 
                 # Insert flattened cancellation reasons with dimension lookup
                 cursor.execute("""
-                    INSERT INTO RAW.fieldroutes.CUSTOMERCANCELLATIONREASONS_FACT
+                    INSERT INTO RAW_DB.FIELDROUTES.CUSTOMERCANCELLATIONREASONS_FACT
                     (OfficeID, CustomerID, CancellationReasonID, CancellationReasonDescription, 
                      DateCancelled, LoadDatetimeUTC)
                     SELECT DISTINCT
@@ -716,18 +716,18 @@ def process_customer_cancellation_reasons(offices: List[Dict], window_end: datet
                         ) as CancellationReasonDescription,
                         c.RawData:dateCancelled::TIMESTAMP_NTZ as DateCancelled,
                         %s as LoadDatetimeUTC
-                    FROM RAW.fieldroutes.CUSTOMER_FACT c
+                    FROM RAW_DB.FIELDROUTES.CUSTOMER_FACT c
                     CROSS JOIN LATERAL FLATTEN(
                         INPUT => c.RawData:cancellationReasonIDs,
                         OUTER => TRUE
                     ) cr
-                    LEFT JOIN RAW.fieldroutes.CANCELLATIONREASON_DIM crd
+                    LEFT JOIN RAW_DB.FIELDROUTES.CANCELLATIONREASON_DIM crd
                         ON crd.OfficeID = c.OfficeID
                         AND crd.RawData:cancellationReasonID::INTEGER = cr.value::INTEGER
                     WHERE c.OfficeID = %s
                     AND c.LoadDatetimeUTC = (
                         SELECT MAX(LoadDatetimeUTC) 
-                        FROM RAW.fieldroutes.CUSTOMER_FACT 
+                        FROM RAW_DB.FIELDROUTES.CUSTOMER_FACT 
                         WHERE OfficeID = %s
                     )
                     AND cr.value IS NOT NULL
@@ -738,7 +738,7 @@ def process_customer_cancellation_reasons(offices: List[Dict], window_end: datet
                 # Get count of records processed
                 cursor.execute("""
                     SELECT COUNT(*) 
-                    FROM RAW.fieldroutes.CUSTOMERCANCELLATIONREASONS_FACT
+                    FROM RAW_DB.FIELDROUTES.CUSTOMERCANCELLATIONREASONS_FACT
                     WHERE OfficeID = %s AND LoadDatetimeUTC = %s
                 """, (office['office_id'], load_timestamp))
                 
@@ -840,7 +840,7 @@ def run_fieldroutes_etl(
             query = f"""
                 SELECT office_id, office_name, base_url,
                        secret_block_name_key, secret_block_name_token
-                FROM RAW.REF.offices_lookup
+                FROM RAW_DB.REF.offices_lookup
                 WHERE active = TRUE AND office_id IN ({placeholders})
             """
             cursor.execute(query, office_filter)
@@ -848,7 +848,7 @@ def run_fieldroutes_etl(
             cursor.execute("""
                 SELECT office_id, office_name, base_url,
                        secret_block_name_key, secret_block_name_token
-                FROM RAW.REF.offices_lookup
+                FROM RAW_DB.REF.offices_lookup
                 WHERE active = TRUE
             """)
         
@@ -932,15 +932,15 @@ def run_fieldroutes_etl(
     if failed_count > 0:
         raise RuntimeError(f"{failed_count} tasks failed. Check logs for details.")
     
-    # Transform raw data to analytics tables
-    logger.info("Starting transformation to analytics tables...")
+    # Transform raw data to staging tables
+    logger.info("Starting transformation to staging tables...")
     try:
-        from transform_to_analytics_flow import transform_raw_to_analytics
+        from transform_to_analytics_flow import transform_raw_to_staging
         # Run incremental transformation after successful ETL
-        transform_raw_to_analytics(incremental=True, run_quality_checks=True)
-        logger.info("Analytics transformation completed successfully")
+        transform_raw_to_staging(incremental=True, run_quality_checks=True)
+        logger.info("Staging transformation completed successfully")
     except Exception as e:
-        logger.error(f"Analytics transformation failed: {str(e)}")
+        logger.error(f"Staging transformation failed: {str(e)}")
         # Don't fail the entire flow if transformation fails
         # This allows raw data to be loaded even if transformation has issues
 

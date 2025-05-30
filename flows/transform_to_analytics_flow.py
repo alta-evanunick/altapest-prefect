@@ -8,15 +8,17 @@ from prefect import flow, task, get_run_logger
 from prefect_snowflake import SnowflakeConnector
 
 
-@task(name="create_analytics_schema")
-def create_analytics_schema(snowflake: SnowflakeConnector) -> None:
-    """Create ANALYTICS schema if it doesn't exist"""
+@task(name="create_staging_schema")
+def create_staging_schema(snowflake: SnowflakeConnector) -> None:
+    """Create STAGING_DB and schema if they don't exist"""
     logger = get_run_logger()
     
     with snowflake.get_connection() as conn:
         with conn.cursor() as cursor:
-            cursor.execute("CREATE SCHEMA IF NOT EXISTS ANALYTICS")
-            logger.info("ANALYTICS schema ready")
+            cursor.execute("CREATE DATABASE IF NOT EXISTS STAGING_DB")
+            cursor.execute("USE DATABASE STAGING_DB")
+            cursor.execute("CREATE SCHEMA IF NOT EXISTS FIELDROUTES")
+            logger.info("STAGING_DB.FIELDROUTES schema ready")
 
 
 @task(name="transform_dimension_tables")
@@ -26,7 +28,7 @@ def transform_dimension_tables(snowflake: SnowflakeConnector) -> None:
     
     dimension_transformations = {
         "DIM_OFFICE": """
-            CREATE OR REPLACE TABLE ANALYTICS.DIM_OFFICE AS
+            CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.DIM_OFFICE AS
             SELECT DISTINCT
                 RawData:officeID::INTEGER as OfficeID,
                 RawData:officeName::STRING as OfficeName,
@@ -38,27 +40,27 @@ def transform_dimension_tables(snowflake: SnowflakeConnector) -> None:
                 RawData:phone::STRING as Phone,
                 RawData:isActive::BOOLEAN as IsActive,
                 CURRENT_TIMESTAMP() as LoadDatetimeUTC
-            FROM RAW.fieldroutes.OFFICE_DIM
+            FROM RAW_DB.FIELDROUTES.OFFICE_DIM
             WHERE LoadDatetimeUTC = (
-                SELECT MAX(LoadDatetimeUTC) FROM RAW.fieldroutes.OFFICE_DIM
+                SELECT MAX(LoadDatetimeUTC) FROM RAW_DB.FIELDROUTES.OFFICE_DIM
             )
         """,
         
         "DIM_REGION": """
-            CREATE OR REPLACE TABLE ANALYTICS.DIM_REGION AS
+            CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.DIM_REGION AS
             SELECT DISTINCT
                 RawData:regionID::INTEGER as RegionID,
                 RawData:regionName::STRING as RegionName,
                 RawData:isActive::BOOLEAN as IsActive,
                 CURRENT_TIMESTAMP() as LoadDatetimeUTC
-            FROM RAW.fieldroutes.REGION_DIM
+            FROM RAW_DB.FIELDROUTES.REGION_DIM
             WHERE LoadDatetimeUTC = (
-                SELECT MAX(LoadDatetimeUTC) FROM RAW.fieldroutes.REGION_DIM
+                SELECT MAX(LoadDatetimeUTC) FROM RAW_DB.FIELDROUTES.REGION_DIM
             )
         """,
         
         "DIM_SERVICE_TYPE": """
-            CREATE OR REPLACE TABLE ANALYTICS.DIM_SERVICE_TYPE AS
+            CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.DIM_SERVICE_TYPE AS
             SELECT DISTINCT
                 RawData:typeID::INTEGER as ServiceTypeID,
                 RawData:description::STRING as ServiceTypeName,
@@ -67,27 +69,27 @@ def transform_dimension_tables(snowflake: SnowflakeConnector) -> None:
                 RawData:defaultCharge::FLOAT as DefaultCharge,
                 RawData:isActive::BOOLEAN as IsActive,
                 CURRENT_TIMESTAMP() as LoadDatetimeUTC
-            FROM RAW.fieldroutes.SERVICETYPE_DIM
+            FROM RAW_DB.FIELDROUTES.SERVICETYPE_DIM
             WHERE LoadDatetimeUTC = (
-                SELECT MAX(LoadDatetimeUTC) FROM RAW.fieldroutes.SERVICETYPE_DIM
+                SELECT MAX(LoadDatetimeUTC) FROM RAW_DB.FIELDROUTES.SERVICETYPE_DIM
             )
         """,
         
         "DIM_CUSTOMER_SOURCE": """
-            CREATE OR REPLACE TABLE ANALYTICS.DIM_CUSTOMER_SOURCE AS
+            CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.DIM_CUSTOMER_SOURCE AS
             SELECT DISTINCT
                 RawData:sourceID::INTEGER as SourceID,
                 RawData:source::STRING as SourceName,
                 RawData:isActive::BOOLEAN as IsActive,
                 CURRENT_TIMESTAMP() as LoadDatetimeUTC
-            FROM RAW.fieldroutes.CUSTOMERSOURCE_DIM
+            FROM RAW_DB.FIELDROUTES.CUSTOMERSOURCE_DIM
             WHERE LoadDatetimeUTC = (
-                SELECT MAX(LoadDatetimeUTC) FROM RAW.fieldroutes.CUSTOMERSOURCE_DIM
+                SELECT MAX(LoadDatetimeUTC) FROM RAW_DB.FIELDROUTES.CUSTOMERSOURCE_DIM
             )
         """,
         
         "DIM_PRODUCT": """
-            CREATE OR REPLACE TABLE ANALYTICS.DIM_PRODUCT AS
+            CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.DIM_PRODUCT AS
             SELECT DISTINCT
                 RawData:productID::INTEGER as ProductID,
                 RawData:productName::STRING as ProductName,
@@ -95,22 +97,22 @@ def transform_dimension_tables(snowflake: SnowflakeConnector) -> None:
                 RawData:unitCost::FLOAT as UnitCost,
                 RawData:isActive::BOOLEAN as IsActive,
                 CURRENT_TIMESTAMP() as LoadDatetimeUTC
-            FROM RAW.fieldroutes.PRODUCT_DIM
+            FROM RAW_DB.FIELDROUTES.PRODUCT_DIM
             WHERE LoadDatetimeUTC = (
-                SELECT MAX(LoadDatetimeUTC) FROM RAW.fieldroutes.PRODUCT_DIM
+                SELECT MAX(LoadDatetimeUTC) FROM RAW_DB.FIELDROUTES.PRODUCT_DIM
             )
         """,
         
         "DIM_CANCELLATION_REASON": """
-            CREATE OR REPLACE TABLE ANALYTICS.DIM_CANCELLATION_REASON AS
+            CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.DIM_CANCELLATION_REASON AS
             SELECT DISTINCT
                 RawData:reasonID::INTEGER as ReasonID,
                 RawData:reason::STRING as ReasonName,
                 RawData:isActive::BOOLEAN as IsActive,
                 CURRENT_TIMESTAMP() as LoadDatetimeUTC
-            FROM RAW.fieldroutes.CANCELLATIONREASON_DIM
+            FROM RAW_DB.FIELDROUTES.CANCELLATIONREASON_DIM
             WHERE LoadDatetimeUTC = (
-                SELECT MAX(LoadDatetimeUTC) FROM RAW.fieldroutes.CANCELLATIONREASON_DIM
+                SELECT MAX(LoadDatetimeUTC) FROM RAW_DB.FIELDROUTES.CANCELLATIONREASON_DIM
             )
         """
     }
@@ -137,7 +139,7 @@ def transform_fact_tables(snowflake: SnowflakeConnector, incremental: bool = Tru
     
     fact_transformations = {
         "FACT_CUSTOMER": f"""
-            MERGE INTO ANALYTICS.FACT_CUSTOMER tgt
+            MERGE INTO STAGING_DB.FIELDROUTES.FACT_CUSTOMER tgt
             USING (
                 SELECT 
                     RawData:customerID::INTEGER as CustomerID,
@@ -168,7 +170,7 @@ def transform_fact_tables(snowflake: SnowflakeConnector, incremental: bool = Tru
                     RawData:dateCancelled::TIMESTAMP_NTZ as DateCancelled,
                     LoadDatetimeUTC,
                     ROW_NUMBER() OVER (PARTITION BY RawData:customerID::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
-                FROM RAW.fieldroutes.CUSTOMER_FACT
+                FROM RAW_DB.FIELDROUTES.CUSTOMER_FACT
                 {where_clause}
             ) src
             ON tgt.CustomerID = src.CustomerID
@@ -217,7 +219,7 @@ def transform_fact_tables(snowflake: SnowflakeConnector, incremental: bool = Tru
         """,
         
         "FACT_TICKET": f"""
-            MERGE INTO ANALYTICS.FACT_TICKET tgt
+            MERGE INTO STAGING_DB.FIELDROUTES.FACT_TICKET tgt
             USING (
                 SELECT 
                     RawData:ticketID::INTEGER as TicketID,
@@ -239,7 +241,7 @@ def transform_fact_tables(snowflake: SnowflakeConnector, incremental: bool = Tru
                     RawData:status::STRING as Status,
                     LoadDatetimeUTC,
                     ROW_NUMBER() OVER (PARTITION BY RawData:ticketID::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
-                FROM RAW.fieldroutes.TICKET_FACT
+                FROM RAW_DB.FIELDROUTES.TICKET_FACT
                 {where_clause}
             ) src
             ON tgt.TicketID = src.TicketID
@@ -275,7 +277,7 @@ def transform_fact_tables(snowflake: SnowflakeConnector, incremental: bool = Tru
         """,
         
         "FACT_PAYMENT": f"""
-            MERGE INTO ANALYTICS.FACT_PAYMENT tgt
+            MERGE INTO STAGING_DB.FIELDROUTES.FACT_PAYMENT tgt
             USING (
                 SELECT 
                     RawData:paymentID::INTEGER as PaymentID,
@@ -291,7 +293,7 @@ def transform_fact_tables(snowflake: SnowflakeConnector, incremental: bool = Tru
                     RawData:dateUpdated::TIMESTAMP_NTZ as DateUpdated,
                     LoadDatetimeUTC,
                     ROW_NUMBER() OVER (PARTITION BY RawData:paymentID::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
-                FROM RAW.fieldroutes.PAYMENT_FACT
+                FROM RAW_DB.FIELDROUTES.PAYMENT_FACT
                 {where_clause}
             ) src
             ON tgt.PaymentID = src.PaymentID
@@ -319,7 +321,7 @@ def transform_fact_tables(snowflake: SnowflakeConnector, incremental: bool = Tru
         """,
         
         "FACT_APPLIED_PAYMENT": f"""
-            MERGE INTO ANALYTICS.FACT_APPLIED_PAYMENT tgt
+            MERGE INTO STAGING_DB.FIELDROUTES.FACT_APPLIED_PAYMENT tgt
             USING (
                 SELECT 
                     RawData:appliedPaymentID::INTEGER as AppliedPaymentID,
@@ -331,7 +333,7 @@ def transform_fact_tables(snowflake: SnowflakeConnector, incremental: bool = Tru
                     RawData:dateUpdated::TIMESTAMP_NTZ as DateUpdated,
                     LoadDatetimeUTC,
                     ROW_NUMBER() OVER (PARTITION BY RawData:appliedPaymentID::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
-                FROM RAW.fieldroutes.APPLIEDPAYMENT_FACT
+                FROM RAW_DB.FIELDROUTES.APPLIEDPAYMENT_FACT
                 {where_clause}
             ) src
             ON tgt.AppliedPaymentID = src.AppliedPaymentID
@@ -356,7 +358,7 @@ def transform_fact_tables(snowflake: SnowflakeConnector, incremental: bool = Tru
     # First create tables if they don't exist
     create_statements = {
         "FACT_CUSTOMER": """
-            CREATE TABLE IF NOT EXISTS ANALYTICS.FACT_CUSTOMER (
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_CUSTOMER (
                 CustomerID INTEGER PRIMARY KEY,
                 OfficeID INTEGER,
                 FirstName STRING,
@@ -387,7 +389,7 @@ def transform_fact_tables(snowflake: SnowflakeConnector, incremental: bool = Tru
             )
         """,
         "FACT_TICKET": """
-            CREATE TABLE IF NOT EXISTS ANALYTICS.FACT_TICKET (
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_TICKET (
                 TicketID INTEGER PRIMARY KEY,
                 OfficeID INTEGER,
                 CustomerID INTEGER,
@@ -409,7 +411,7 @@ def transform_fact_tables(snowflake: SnowflakeConnector, incremental: bool = Tru
             )
         """,
         "FACT_PAYMENT": """
-            CREATE TABLE IF NOT EXISTS ANALYTICS.FACT_PAYMENT (
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_PAYMENT (
                 PaymentID INTEGER PRIMARY KEY,
                 OfficeID INTEGER,
                 CustomerID INTEGER,
@@ -425,7 +427,7 @@ def transform_fact_tables(snowflake: SnowflakeConnector, incremental: bool = Tru
             )
         """,
         "FACT_APPLIED_PAYMENT": """
-            CREATE TABLE IF NOT EXISTS ANALYTICS.FACT_APPLIED_PAYMENT (
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_APPLIED_PAYMENT (
                 AppliedPaymentID INTEGER PRIMARY KEY,
                 PaymentID INTEGER,
                 TicketID INTEGER,
@@ -493,27 +495,27 @@ def validate_data_quality(snowflake: SnowflakeConnector) -> Dict[str, any]:
     quality_checks = {
         "customer_orphans": """
             SELECT COUNT(*) as orphan_count
-            FROM ANALYTICS.FACT_TICKET t
-            LEFT JOIN ANALYTICS.FACT_CUSTOMER c ON t.CustomerID = c.CustomerID
+            FROM STAGING_DB.FIELDROUTES.FACT_TICKET t
+            LEFT JOIN STAGING_DB.FIELDROUTES.FACT_CUSTOMER c ON t.CustomerID = c.CustomerID
             WHERE c.CustomerID IS NULL
         """,
         
         "payment_without_ticket": """
             SELECT COUNT(*) as unlinked_payments
-            FROM ANALYTICS.FACT_APPLIED_PAYMENT ap
-            LEFT JOIN ANALYTICS.FACT_TICKET t ON ap.TicketID = t.TicketID
+            FROM STAGING_DB.FIELDROUTES.FACT_APPLIED_PAYMENT ap
+            LEFT JOIN STAGING_DB.FIELDROUTES.FACT_TICKET t ON ap.TicketID = t.TicketID
             WHERE t.TicketID IS NULL
         """,
         
         "negative_balances": """
             SELECT COUNT(*) as negative_balance_count
-            FROM ANALYTICS.FACT_CUSTOMER
+            FROM STAGING_DB.FIELDROUTES.FACT_CUSTOMER
             WHERE Balance < 0
         """,
         
         "future_dated_tickets": """
             SELECT COUNT(*) as future_tickets
-            FROM ANALYTICS.FACT_TICKET
+            FROM STAGING_DB.FIELDROUTES.FACT_TICKET
             WHERE CompletedOn > CURRENT_TIMESTAMP()
         """
     }
@@ -534,13 +536,13 @@ def validate_data_quality(snowflake: SnowflakeConnector) -> Dict[str, any]:
     return results
 
 
-@flow(name="transform-to-analytics")
-def transform_raw_to_analytics(
+@flow(name="transform-raw-to-staging")
+def transform_raw_to_staging(
     incremental: bool = True,
     run_quality_checks: bool = True
 ):
     """
-    Transform raw FieldRoutes data to analytics-ready tables
+    Transform raw FieldRoutes data to staging tables
     
     Args:
         incremental: If True, only process recent data. If False, full reload.
@@ -550,10 +552,10 @@ def transform_raw_to_analytics(
     logger.info(f"Starting transformation - Mode: {'Incremental' if incremental else 'Full'}")
     
     # Get Snowflake connection
-    snowflake = SnowflakeConnector.load("snowflake-connector")
+    snowflake = SnowflakeConnector.load("snowflake-altapestdb")
     
-    # Create analytics schema
-    create_analytics_schema(snowflake)
+    # Create staging schema
+    create_staging_schema(snowflake)
     
     # Transform dimension tables (always full refresh for dims)
     transform_dimension_tables(snowflake)

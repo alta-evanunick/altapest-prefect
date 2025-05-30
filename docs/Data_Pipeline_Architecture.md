@@ -2,24 +2,48 @@
 
 ## Overview
 
-The data pipeline consists of three main layers:
+The data pipeline consists of three main layers across three databases:
 
-1. **Extract & Load (ETL)**: Pulls data from FieldRoutes API → RAW schema
-2. **Transform**: Processes RAW data → ANALYTICS schema  
-3. **Reporting**: Views and materialized tables for Power BI consumption
+1. **Extract & Load (ETL)**: Pulls data from FieldRoutes API → RAW_DB
+2. **Transform**: Processes RAW data → STAGING_DB  
+3. **Reporting**: Views in PRODUCTION_DB for Power BI consumption
 
 ## Data Flow
 
 ```
 FieldRoutes API
-    ↓ (Prefect ETL - every 30 min for CDC, nightly for full)
-RAW.fieldroutes.* tables (JSON in VARIANT column)
+    ↓ (Prefect ETL - every 2 hours for CDC, nightly for full)
+RAW_DB.FIELDROUTES.* tables (JSON in VARIANT column)
     ↓ (Transformation flow - every hour)
-ANALYTICS.* tables (Structured, typed columns)
+STAGING_DB.FIELDROUTES.* tables (Structured, typed columns)
     ↓ (SQL Views)
-Reporting Views (VW_*)
+PRODUCTION_DB.FIELDROUTES.VW_* (Business-ready views)
     ↓
 Power BI Dashboards
+```
+
+## Database Architecture
+
+```
+ALTAPESTANALYTICS (Warehouse)
+├── RAW_DB
+│   ├── FIELDROUTES (schema)
+│   │   ├── CUSTOMER_FACT
+│   │   ├── TICKET_FACT
+│   │   └── ... (raw JSON data)
+│   └── REF (schema)
+│       ├── offices_lookup
+│       └── office_entity_watermark
+├── STAGING_DB
+│   └── FIELDROUTES (schema)
+│       ├── DIM_CUSTOMER
+│       ├── FACT_TICKET
+│       └── ... (typed, cleaned data)
+└── PRODUCTION_DB
+    └── FIELDROUTES (schema)
+        ├── VW_CUSTOMER
+        ├── VW_AR_AGING
+        └── ... (business-ready views)
 ```
 
 ## Layer Details
