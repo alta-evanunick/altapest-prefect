@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## IMPORTANT CODING STANDARDS
+
+**UTF-8 Compatibility**: Do NOT use the red "X" emoji (❌) in any code files - it causes UTF-8 deployment errors. Use text alternatives like "FAILED", "ERROR", or "[X]" instead.
+
 ## Project Overview
 
 This is a Prefect-based ETL pipeline that extracts data from the FieldRoutes API and loads it directly into Snowflake. The pipeline handles both nightly full loads and CDC (Change Data Capture) for high-velocity entities.
@@ -18,10 +22,20 @@ This is a Prefect-based ETL pipeline that extracts data from the FieldRoutes API
 ### Data Flow Architecture
 
 ```
-FieldRoutes API → Prefect Tasks → JSON Processing → Snowflake (RAW.fieldroutes)
+FieldRoutes API → Prefect Tasks → JSON Processing → Snowflake RAW_DB.FIELDROUTES
                       ↓
-                  Watermark Updates (RAW.REF.office_entity_watermark)
+                  Watermark Updates → RAW_DB.REF.office_entity_watermark
+                      ↓
+              Transformation Flow → STAGING_DB.FIELDROUTES
+                      ↓
+              Production Views → PRODUCTION_DB.FIELDROUTES
 ```
+
+### Three-Database Architecture
+- **RAW_DB**: Raw JSON data from source systems
+- **STAGING_DB**: Transformed, structured data ready for analytics
+- **PRODUCTION_DB**: Business-facing views and reports
+- Each database contains schemas for different sources (FIELDROUTES, future QUICKBOOKS, etc.)
 
 ## Development Commands
 

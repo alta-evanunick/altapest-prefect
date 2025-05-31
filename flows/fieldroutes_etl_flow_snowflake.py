@@ -529,11 +529,11 @@ def fetch_entity(
             """, (office["office_id"],))
             
             # Prepare insert SQL based on entity type
-            if  insert_sql = f"""
-                    INSERT INTO RAW_DB.FIELDROUTES.{staging_table} 
-                    (OfficeID, LoadDatetimeUTC, RawDataString)
-                    VALUES (%s, %s, %s)
-                """
+            insert_sql = f"""
+                INSERT INTO RAW_DB.FIELDROUTES.{staging_table} 
+                (OfficeID, LoadDatetimeUTC, RawDataString)
+                VALUES (%s, %s, %s)
+            """
             
             # Insert in smaller batches to avoid any size limits
             batch_size = 1000
@@ -546,17 +546,17 @@ def fetch_entity(
                 logger.info(f"Staged batch {i//batch_size + 1}: {total_staged}/{len(data_rows)} records")
             
             # Now move from staging to final table with TRY_PARSE_JSON
-            if  cursor.execute(f"""
-                    INSERT INTO RAW_DB.FIELDROUTES.{table_name} 
-                    (OfficeID, LoadDatetimeUTC, RawData)
-                    SELECT 
-                        OfficeID,
-                        LoadDatetimeUTC,
-                        TRY_PARSE_JSON(RawDataString)
-                    FROM RAW_DB.FIELDROUTES.{staging_table}
-                    WHERE OfficeID = %s
-                    AND TRY_PARSE_JSON(RawDataString) IS NOT NULL
-                """, (office["office_id"],))
+            cursor.execute(f"""
+                INSERT INTO RAW_DB.FIELDROUTES.{table_name} 
+                (OfficeID, LoadDatetimeUTC, RawData)
+                SELECT 
+                    OfficeID,
+                    LoadDatetimeUTC,
+                    TRY_PARSE_JSON(RawDataString)
+                FROM RAW_DB.FIELDROUTES.{staging_table}
+                WHERE OfficeID = %s
+                AND TRY_PARSE_JSON(RawDataString) IS NOT NULL
+            """, (office["office_id"],))
             
             # Get count of successful inserts
             cursor.execute(f"""
