@@ -298,7 +298,7 @@ def transform_fact_tables(incremental: bool = True) -> None:
                          THEN NULL ELSE TRY_TO_DATE(RawData:agingDate::STRING) END as AgingDate,
                     CASE WHEN RawData:responsibleAgingDate::STRING IN ('0000-00-00', '', '0000-00-00 00:00:00') OR RawData:responsibleAgingDate IS NULL 
                          THEN NULL ELSE TRY_TO_DATE(RawData:responsibleAgingDate::STRING) END as ResponsibleAgingDate,
-                    RawData:salesmanAPay::INTEGER as SalesmanAPay,
+                    RawData:salesmanAPay::STRING as SalesmanAPay,
                     RawData:termiteMonitoring::INTEGER as TermiteMonitoring,
                     RawData:pendingCancel::INTEGER as PendingCancel,
                     LoadDatetimeUTC,
@@ -733,7 +733,7 @@ def transform_fact_tables(incremental: bool = True) -> None:
     # First create tables if they don't exist
     create_statements = {
         "FACT_CUSTOMER": """
-            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_CUSTOMER (
+            CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_CUSTOMER (
                 CustomerID INTEGER PRIMARY KEY,
                 BillToAccountID INTEGER,
                 OfficeID INTEGER,
@@ -812,7 +812,7 @@ def transform_fact_tables(incremental: bool = True) -> None:
                 DivisionID INTEGER,
                 AgingDate DATE,
                 ResponsibleAgingDate DATE,
-                SalesmanAPay INTEGER,
+                SalesmanAPay STRING,
                 TermiteMonitoring INTEGER,
                 PendingCancel INTEGER,
                 LoadDatetimeUTC TIMESTAMP_NTZ
