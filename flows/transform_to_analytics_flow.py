@@ -59,8 +59,10 @@ def transform_dimension_tables() -> None:
             SELECT DISTINCT
                 RawData:regionID::INTEGER as RegionID,
                 RawData:officeID::INTEGER as OfficeID,
-                RawData:created::TIMESTAMP_NTZ as DateCreated,
-                RawData:deleted::TIMESTAMP_NTZ as DateDeleted,
+                CASE WHEN RawData:created::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:created IS NULL 
+                     THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:created::STRING) END as DateCreated,
+                CASE WHEN RawData:deleted::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:deleted IS NULL 
+                     THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:deleted::STRING) END as DateDeleted,
                 RawData:points::VARIANT as LatAndLong,
                 RawData:type::STRING as RegionType,
                 RawData:active::BOOLEAN as IsActive,
@@ -160,8 +162,10 @@ def transform_dimension_tables() -> None:
                 RawData:description::STRING as FlagDescription,
                 RawData:status::STRING as FlagStatus,
                 RawData:type::STRING as FlagType,
-                RawData:dateCreated::TIMESTAMP_NTZ as DateCreated,
-                RawData:dateUpdated::TIMESTAMP_NTZ as DateUpdated,
+                CASE WHEN RawData:dateCreated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateCreated IS NULL 
+                     THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateCreated::STRING) END as DateCreated,
+                CASE WHEN RawData:dateUpdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateUpdated IS NULL 
+                     THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateUpdated::STRING) END as DateUpdated,
                 CURRENT_TIMESTAMP() as LoadDatetimeUTC
             FROM RAW_DB.FIELDROUTES.GENERICFLAG_DIM
             WHERE LoadDatetimeUTC = (
@@ -242,9 +246,12 @@ def transform_fact_tables(incremental: bool = True) -> None:
                     RawData:lng::FLOAT as Longitude,
                     RawData:squareFeet::INTEGER as SqFeet,
                     RawData:addedByID::INTEGER as AddedByEmployeeID,
-                    RawData:dateAdded::TIMESTAMP_NTZ as DateAdded,
-                    RawData:dateCancelled::TIMESTAMP_NTZ as DateCancelled,
-                    RawData:dateUpdated::TIMESTAMP_NTZ as DateUpdated,
+                    CASE WHEN RawData:dateAdded::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateAdded IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateAdded::STRING) END as DateAdded,
+                    CASE WHEN RawData:dateCancelled::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateCancelled IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateCancelled::STRING) END as DateCancelled,
+                    CASE WHEN RawData:dateUpdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateUpdated IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateUpdated::STRING) END as DateUpdated,
                     RawData:sourceID::INTEGER as SourceID,
                     RawData:source::STRING as Source,
                     RawData:aPay::BOOLEAN as APay,
@@ -257,7 +264,8 @@ def transform_fact_tables(incremental: bool = True) -> None:
                     RawData:responsibleBalanceAge::INTEGER as ResponsibleBalanceAge,
                     RawData:masterAccount::INTEGER as MasterAccount,
                     RawData:preferredBillingDate::STRING as PreferredBillingDate,
-                    RawData:paymentHoldDate::DATE as PaymentHoldDate,
+                    CASE WHEN RawData:paymentHoldDate::STRING IN ('0000-00-00', '', '0000-00-00 00:00:00') OR RawData:paymentHoldDate IS NULL 
+                         THEN NULL ELSE TRY_TO_DATE(RawData:paymentHoldDate::STRING) END as PaymentHoldDate,
                     RawData:mostRecentCreditCardLastFour::STRING as LatestCCLastFour,
                     RawData:mostRecentCreditCardExpirationDate::STRING as LatestCCExpDate,
                     RawData:appointmentIDs::VARIANT as AppointmentIDs,
@@ -286,8 +294,10 @@ def transform_fact_tables(incremental: bool = True) -> None:
                     RawData:county::STRING as County,
                     RawData:autopayPaymentProfileID::INTEGER as AutopayPaymentProfileID,
                     RawData:divisionID::INTEGER as DivisionID,
-                    RawData:agingDate::DATE as AgingDate,
-                    RawData:responsibleAgingDate::DATE as ResponsibleAgingDate,
+                    CASE WHEN RawData:agingDate::STRING IN ('0000-00-00', '', '0000-00-00 00:00:00') OR RawData:agingDate IS NULL 
+                         THEN NULL ELSE TRY_TO_DATE(RawData:agingDate::STRING) END as AgingDate,
+                    CASE WHEN RawData:responsibleAgingDate::STRING IN ('0000-00-00', '', '0000-00-00 00:00:00') OR RawData:responsibleAgingDate IS NULL 
+                         THEN NULL ELSE TRY_TO_DATE(RawData:responsibleAgingDate::STRING) END as ResponsibleAgingDate,
                     RawData:salesmanAPay::BOOLEAN as SalesmanAPay,
                     RawData:termiteMonitoring::BOOLEAN as TermiteMonitoring,
                     RawData:pendingCancel::BOOLEAN as PendingCancel,
@@ -435,7 +445,8 @@ def transform_fact_tables(incremental: bool = True) -> None:
                     RawData:supervisorID::INTEGER as SupervisorID,
                     RawData:roamingRep::BOOLEAN as RoamingRep,
                     RawData:regionalManagerOfficeIDs::VARIANT as RegionalManagerOfficeIDs,
-                    RawData:lastLogin::TIMESTAMP_NTZ as LastLogin,
+                    CASE WHEN RawData:lastLogin::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:lastLogin IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:lastLogin::STRING) END as LastLogin,
                     RawData:teamIDs::VARIANT as TeamIDs,
                     RawData:primaryTeam::STRING as PrimaryTeam,
                     RawData:accessControlProfileID::INTEGER as AccessControlProfileID,
@@ -451,7 +462,8 @@ def transform_fact_tables(incremental: bool = True) -> None:
                     RawData:endZip::STRING as EndZip,
                     RawData:endLat::FLOAT as EndLatitude,
                     RawData:endLng::FLOAT as EndLongitude,
-                    RawData:dateUpdated::TIMESTAMP_NTZ as DateUpdated,
+                    CASE WHEN RawData:dateUpdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateUpdated IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateUpdated::STRING) END as DateUpdated,
                     LoadDatetimeUTC,
                     ROW_NUMBER() OVER (PARTITION BY RawData:employeeID::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                 FROM RAW_DB.FIELDROUTES.EMPLOYEE_FACT
@@ -520,9 +532,12 @@ def transform_fact_tables(incremental: bool = True) -> None:
                     RawData:customerID::INTEGER as CustomerID,
                     RawData:billToAccountID::INTEGER as BillToAccountID,
                     RawData:officeID::INTEGER as OfficeID,
-                    RawData:dateCreated::TIMESTAMP_NTZ as DateCreated,
-                    RawData:invoiceDate::DATE as InvoiceDate,
-                    RawData:dateUpdated::TIMESTAMP_NTZ as DateUpdated,
+                    CASE WHEN RawData:dateCreated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateCreated IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateCreated::STRING) END as DateCreated,
+                    CASE WHEN RawData:invoiceDate::STRING IN ('0000-00-00', '', '0000-00-00 00:00:00') OR RawData:invoiceDate IS NULL 
+                         THEN NULL ELSE TRY_TO_DATE(RawData:invoiceDate::STRING) END as InvoiceDate,
+                    CASE WHEN RawData:dateUpdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateUpdated IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateUpdated::STRING) END as DateUpdated,
                     RawData:active::BOOLEAN as IsActive,
                     RawData:subtotal::FLOAT as Subtotal,
                     RawData:taxAmount::FLOAT as TaxAmount,
@@ -589,7 +604,8 @@ def transform_fact_tables(incremental: bool = True) -> None:
                     RawData:paymentID::INTEGER as PaymentID,
                     RawData:officeID::INTEGER as OfficeID,
                     RawData:customerID::INTEGER as CustomerID,
-                    RawData:date::DATE as PaymentDate,
+                    CASE WHEN RawData:date::STRING IN ('0000-00-00', '', '0000-00-00 00:00:00') OR RawData:date IS NULL 
+                         THEN NULL ELSE TRY_TO_DATE(RawData:date::STRING) END as PaymentDate,
                     RawData:paymentMethod::STRING as PaymentMethod,
                     RawData:amount::FLOAT as Amount,
                     RawData:appliedAmount::FLOAT as AppliedAmount,
@@ -606,10 +622,13 @@ def transform_fact_tables(incremental: bool = True) -> None:
                     RawData:originalPaymentID::INTEGER as OriginalPaymentID,
                     RawData:lastFour::STRING as LastFour,
                     RawData:notes::STRING as PaymentNotes,
-                    RawData:batchOpened::TIMESTAMP_NTZ as BatchOpened,
-                    RawData:batchClosed::TIMESTAMP_NTZ as BatchClosed,
+                    CASE WHEN RawData:batchOpened::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:batchOpened IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:batchOpened::STRING) END as BatchOpened,
+                    CASE WHEN RawData:batchClosed::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:batchClosed IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:batchClosed::STRING) END as BatchClosed,
                     RawData:paymentSource::STRING as PaymentSource,
-                    RawData:dateUpdated::TIMESTAMP_NTZ as DateUpdated,
+                    CASE WHEN RawData:dateUpdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateUpdated IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateUpdated::STRING) END as DateUpdated,
                     RawData:transactionID::STRING as TransactionID,
                     RawData:subscriptionID::INTEGER as SubscriptionID,
                     RawData:cardType::STRING as CardType,
@@ -675,11 +694,13 @@ def transform_fact_tables(incremental: bool = True) -> None:
                     RawData:paymentID::INTEGER as PaymentID,
                     RawData:ticketID::INTEGER as TicketID,
                     RawData:customerID::INTEGER as CustomerID,
-                    RawData:dateApplied::TIMESTAMP_NTZ as DateApplied,
+                    CASE WHEN RawData:dateApplied::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateApplied IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateApplied::STRING) END as DateApplied,
                     RawData:appliedBy::INTEGER as AppliedByEmployeeID,
                     RawData:appliedAmount::FLOAT as AppliedAmount,
                     RawData:taxCollected::FLOAT as TaxCollected,
-                    RawData:dateUpdated::TIMESTAMP_NTZ as DateUpdated,
+                    CASE WHEN RawData:dateUpdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateUpdated IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateUpdated::STRING) END as DateUpdated,
                     LoadDatetimeUTC,
                     ROW_NUMBER() OVER (PARTITION BY RawData:appliedPaymentID::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                 FROM RAW_DB.FIELDROUTES.APPLIEDPAYMENT_FACT
@@ -953,13 +974,15 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                     RawData:subscriptionRegionID::INTEGER as SubscriptionRegionID,
                     RawData:routeID::INTEGER as RouteID,
                     RawData:spotID::INTEGER as SpotID,
-                    RawData:date::DATE as AppointmentDate,
+                    CASE WHEN RawData:date::STRING IN ('0000-00-00', '', '0000-00-00 00:00:00') OR RawData:date IS NULL 
+                         THEN NULL ELSE TRY_TO_DATE(RawData:date::STRING) END as AppointmentDate,
                     RawData:start::TIME as StartTime,
                     RawData:end::TIME as EndTime,
                     RawData:timeWindow::STRING as TimeWindow,
                     RawData:duration::INTEGER as Duration,
                     RawData:type::STRING as AppointmentType,
-                    RawData:dateAdded::TIMESTAMP_NTZ as DateAdded,
+                    CASE WHEN RawData:dateAdded::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateAdded IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateAdded::STRING) END as DateAdded,
                     RawData:employeeID::INTEGER as EmployeeID,
                     RawData:status::STRING as Status,
                     RawData:statusText::STRING as StatusText,
@@ -968,7 +991,8 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                     RawData:subscriptionPreferredTech::INTEGER as SubscriptionPreferredTech,
                     RawData:completedBy::INTEGER as CompletedBy,
                     RawData:servicedBy::STRING as ServicedBy,
-                    RawData:dateCompleted::TIMESTAMP_NTZ as DateCompleted,
+                    CASE WHEN RawData:dateCompleted::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateCompleted IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateCompleted::STRING) END as DateCompleted,
                     RawData:notes::STRING as AppointmentNotes,
                     RawData:officeNotes::STRING as OfficeNotes,
                     RawData:timeIn::TIME as TimeIn,
@@ -980,7 +1004,8 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                     RawData:temperature::FLOAT as Temperature,
                     RawData:servicedInterior::BOOLEAN as IsInterior,
                     RawData:ticketID::INTEGER as TicketID,
-                    RawData:dateCancelled::TIMESTAMP_NTZ as DateCancelled,
+                    CASE WHEN RawData:dateCancelled::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateCancelled IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateCancelled::STRING) END as DateCancelled,
                     RawData:additionalTechs::VARIANT as AdditionalTechs,
                     RawData:appointmentCancellationReason::STRING as AppointmentCancelReason,
                     RawData:cancellationReason::STRING as CancellationReason,
@@ -988,7 +1013,8 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                     RawData:rescheduleReasonID::INTEGER as RescheduleReasonID,
                     RawData:reserviceReasonID::INTEGER as ReserviceReasonID,
                     RawData:targetPests::VARIANT as TargetPests,
-                    RawData:dateUpdated::TIMESTAMP_NTZ as DateUpdated,
+                    CASE WHEN RawData:dateUpdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateUpdated IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateUpdated::STRING) END as DateUpdated,
                     LoadDatetimeUTC,
                     ROW_NUMBER() OVER (PARTITION BY RawData:appointmentID::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                 FROM RAW_DB.FIELDROUTES.APPOINTMENT_FACT
@@ -1065,7 +1091,8 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                     RawData:companyName::STRING as CompanyName,
                     RawData:employeeID::INTEGER as EmployeeID,
                     RawData:employeeName::STRING as EmployeeName,
-                    RawData:date::TIMESTAMP_NTZ as DateCreated,
+                    CASE WHEN RawData:date::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:date IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:date::STRING) END as DateCreated,
                     RawData:showCustomer::BOOLEAN as IsVisibleCustomer,
                     RawData:showTech::BOOLEAN as IsVisibleTechnician,
                     RawData:cancellationReasonID::INTEGER as CancellationReasonID,
@@ -1075,8 +1102,10 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                     RawData:contactTypeCategories::VARIANT as ContactTypeCategories,
                     RawData:notes::STRING as Text,
                     RawData:referenceID::INTEGER as ReferenceID,
-                    RawData:dateAdded::TIMESTAMP_NTZ as DateAdded,
-                    RawData:dateUpdated::TIMESTAMP_NTZ as DateUpdated,
+                    CASE WHEN RawData:dateAdded::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateAdded IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateAdded::STRING) END as DateAdded,
+                    CASE WHEN RawData:dateUpdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateUpdated IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateUpdated::STRING) END as DateUpdated,
                     RawData:openCount::INTEGER as OpenCount,
                     RawData:clicksCount::INTEGER as ClickCount,
                     RawData:emailStatus::STRING as EmailStatus,
