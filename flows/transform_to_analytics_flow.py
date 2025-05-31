@@ -16,6 +16,7 @@ def create_staging_schema() -> None:
     snowflake = SnowflakeConnector.load("snowflake-altapestdb")
     with snowflake.get_connection() as conn:
         with conn.cursor() as cursor:
+            cursor.execute("USE WAREHOUSE ALTAPESTANALYTICS")  # Add warehouse selection
             cursor.execute("CREATE DATABASE IF NOT EXISTS STAGING_DB")
             cursor.execute("USE DATABASE STAGING_DB")
             cursor.execute("CREATE SCHEMA IF NOT EXISTS FIELDROUTES")
@@ -185,6 +186,7 @@ def transform_dimension_tables() -> None:
     
     with snowflake.get_connection() as conn:
         with conn.cursor() as cursor:
+            cursor.execute("USE WAREHOUSE ALTAPESTANALYTICS")  # Add warehouse selection
             for table_name, sql in dimension_transformations.items():
                 logger.info(f"Transforming {table_name}")
                 cursor.execute(sql)
@@ -915,6 +917,7 @@ def transform_fact_tables(incremental: bool = True) -> None:
     
     with snowflake.get_connection() as conn:
         with conn.cursor() as cursor:
+            cursor.execute("USE WAREHOUSE ALTAPESTANALYTICS")  # Add warehouse selection
             # Create tables first
             for table_name, create_sql in create_statements.items():
                 cursor.execute(create_sql)
@@ -1201,6 +1204,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
     
     with snowflake.get_connection() as conn:
         with conn.cursor() as cursor:
+            cursor.execute("USE WAREHOUSE ALTAPESTANALYTICS")  # Add warehouse selection
             # Create tables first
             for table_name, create_sql in additional_creates.items():
                 cursor.execute(create_sql)
@@ -1232,6 +1236,7 @@ def refresh_reporting_views() -> None:
     
     with snowflake.get_connection() as conn:
         with conn.cursor() as cursor:
+            cursor.execute("USE WAREHOUSE ALTAPESTANALYTICS")  # Add warehouse selection
             cursor.execute("USE DATABASE PRODUCTION_DB")
             cursor.execute("USE SCHEMA FIELDROUTES")
             
@@ -1287,6 +1292,7 @@ def validate_data_quality() -> Dict[str, any]:
     results = {}
     with snowflake.get_connection() as conn:
         with conn.cursor() as cursor:
+            cursor.execute("USE WAREHOUSE ALTAPESTANALYTICS")  # Add warehouse selection
             for check_name, query in quality_checks.items():
                 try:
                     cursor.execute(query)
