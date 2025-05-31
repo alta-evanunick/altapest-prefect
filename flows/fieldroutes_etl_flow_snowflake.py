@@ -880,7 +880,7 @@ def run_fieldroutes_etl(
                 logger.info(f"✅ {meta['endpoint']} completed: {fetched} fetched, {loaded} loaded")
                 
             except Exception as e:
-                logger.error(f"❌ {meta['endpoint']} failed for office {office['office_id']}: {str(e)}")
+                logger.error(f"{meta['endpoint']} failed for office {office['office_id']}: {str(e)}")
                 failed_count += 1
     
     # Process customer cancellation reasons aggregation if customer entity was processed
