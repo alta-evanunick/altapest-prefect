@@ -254,7 +254,7 @@ def transform_fact_tables(incremental: bool = True) -> None:
                          THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateUpdated::STRING) END as DateUpdated,
                     RawData:sourceID::INTEGER as SourceID,
                     RawData:source::STRING as Source,
-                    RawData:aPay::BOOLEAN as APay,
+                    RawData:aPay::STRING as APay,
                     RawData:preferredTechID::INTEGER as PreferredTechID,
                     RawData:paidInFull::BOOLEAN as PaidInFull,
                     RawData:subscriptionIDs::VARIANT as SubscriptionIDs,
