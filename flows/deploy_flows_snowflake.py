@@ -301,7 +301,7 @@ if __name__ == "__main__":
     # Deployment 3: Staging Transformation (Every hour)
     staging_deployment = Deployment.build_from_flow(
         flow=transform_raw_to_staging,
-        name="raw-to-staging-transform",
+        name="raw-to-staging-transform-complete",
         work_queue_name="default",
         schedule=CronSchedule(cron="15 * * * *", timezone="America/Los_Angeles"),  # 15 minutes after the hour
         parameters={"incremental": True, "run_quality_checks": True},
@@ -309,7 +309,7 @@ if __name__ == "__main__":
         description="Transform RAW_DB data to STAGING_DB.FIELDROUTES for analytics"
     )
     staging_deployment.apply()
-    print("✅ [3/3] Created: raw-to-staging-transform")
+    print("✅ [3/3] Created: raw-to-staging-transform-complete")
     
     print("\n🎉 All deployments created successfully!")
     print(f"\nUsing 3 of your 5 available deployment slots")
@@ -321,6 +321,6 @@ if __name__ == "__main__":
     print("\nManual execution commands:")
     print("  prefect deployment run 'FieldRoutes_Nightly_ETL_Snowflake/fieldroutes-nightly-etl'")
     print("  prefect deployment run 'FieldRoutes_CDC_ETL_Snowflake/fieldroutes-cdc-etl'")
-    print("  prefect deployment run 'transform-raw-to-staging/raw-to-staging-transform'")
+    print("  prefect deployment run 'transform-raw-to-staging-complete/raw-to-staging-transform-complete'")
     
     # Remove local testing line to keep it clean
