@@ -733,7 +733,7 @@ def transform_fact_tables(incremental: bool = True) -> None:
     # First create tables if they don't exist
     create_statements = {
         "FACT_CUSTOMER": """
-            CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_CUSTOMER (
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_CUSTOMER (
                 CustomerID INTEGER PRIMARY KEY,
                 BillToAccountID INTEGER,
                 OfficeID INTEGER,
@@ -976,8 +976,10 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                     RawData:spotID::INTEGER as SpotID,
                     CASE WHEN RawData:date::STRING IN ('0000-00-00', '', '0000-00-00 00:00:00') OR RawData:date IS NULL 
                          THEN NULL ELSE TRY_TO_DATE(RawData:date::STRING) END as AppointmentDate,
-                    RawData:start::TIME as StartTime,
-                    RawData:end::TIME as EndTime,
+                    CASE WHEN RawData:start IS NULL OR RawData:start::STRING = '' 
+                         THEN NULL ELSE TIME(TRY_TO_TIMESTAMP_NTZ(RawData:start::STRING)) END as StartTime,
+                    CASE WHEN RawData:end IS NULL OR RawData:end::STRING = '' 
+                         THEN NULL ELSE TIME(TRY_TO_TIMESTAMP_NTZ(RawData:end::STRING)) END as EndTime,
                     RawData:timeWindow::STRING as TimeWindow,
                     RawData:duration::INTEGER as Duration,
                     RawData:type::STRING as AppointmentType,
@@ -995,8 +997,10 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                          THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateCompleted::STRING) END as DateCompleted,
                     RawData:notes::STRING as AppointmentNotes,
                     RawData:officeNotes::STRING as OfficeNotes,
-                    RawData:timeIn::TIME as TimeIn,
-                    RawData:timeOut::TIME as TimeOut,
+                    CASE WHEN RawData:TimeIn::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:TimeIn IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:TimeIn::STRING) END as TimeIn,
+                    CASE WHEN RawData:TimeOut::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:TimeOut IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:TimeOut::STRING) END as TimeOut,
                     RawData:checkIn::STRING as CheckIn,
                     RawData:checkOut::STRING as CheckOut,
                     RawData:windSpeed::FLOAT as WindSpeed,
