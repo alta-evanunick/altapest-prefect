@@ -115,7 +115,7 @@ def run_nightly_fieldroutes_etl(
             except Exception as exc:
                 office_failed += 1
                 logger.error(
-                    f"❌ {entity_name} failed for office {office['office_id']}: {exc}"
+                    f"{entity_name} failed for office {office['office_id']}: {exc}"
                 )
 
         # Log office completion summary
@@ -235,7 +235,7 @@ def run_cdc_fieldroutes_etl():
             except Exception as exc:
                 office_failed += 1
                 logger.error(
-                    f"❌ CDC {entity_name} failed for office {office['office_id']}: {exc}"
+                    f"CDC {entity_name} failed for office {office['office_id']}: {exc}"
                 )
         
         # Log office completion summary
