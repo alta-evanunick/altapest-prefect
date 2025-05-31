@@ -9,10 +9,11 @@ from prefect_snowflake import SnowflakeConnector
 
 
 @task(name="create_staging_schema")
-def create_staging_schema(snowflake: SnowflakeConnector) -> None:
+def create_staging_schema() -> None:
     """Create STAGING_DB and schema if they don't exist"""
     logger = get_run_logger()
     
+    snowflake = SnowflakeConnector.load("snowflake-altapestdb")
     with snowflake.get_connection() as conn:
         with conn.cursor() as cursor:
             cursor.execute("CREATE DATABASE IF NOT EXISTS STAGING_DB")
@@ -22,10 +23,11 @@ def create_staging_schema(snowflake: SnowflakeConnector) -> None:
 
 
 @task(name="transform_dimension_tables")
-def transform_dimension_tables(snowflake: SnowflakeConnector) -> None:
+def transform_dimension_tables() -> None:
     """Transform dimension tables from raw to staging schema"""
     logger = get_run_logger()
     
+    snowflake = SnowflakeConnector.load("snowflake-altapestdb")
     dimension_transformations = {
         "DIM_OFFICE": """
             CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.DIM_OFFICE AS
@@ -191,9 +193,10 @@ def transform_dimension_tables(snowflake: SnowflakeConnector) -> None:
 
 
 @task(name="transform_fact_tables")
-def transform_fact_tables(snowflake: SnowflakeConnector, incremental: bool = True) -> None:
+def transform_fact_tables(incremental: bool = True) -> None:
     """Transform fact tables from raw to staging schema"""
     logger = get_run_logger()
+    snowflake = SnowflakeConnector.load("snowflake-altapestdb")
     
     # For incremental loads, only process records from last 48 hours
     where_clause = """
@@ -925,9 +928,10 @@ def transform_fact_tables(snowflake: SnowflakeConnector, incremental: bool = Tru
 
 
 @task(name="transform_additional_fact_tables")
-def transform_additional_fact_tables(snowflake: SnowflakeConnector, incremental: bool = True) -> None:
+def transform_additional_fact_tables(incremental: bool = True) -> None:
     """Transform additional fact tables including appointment, route, note, task"""
     logger = get_run_logger()
+    snowflake = SnowflakeConnector.load("snowflake-altapestdb")
     
     where_clause = """
         WHERE LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())
@@ -1210,9 +1214,10 @@ def transform_additional_fact_tables(snowflake: SnowflakeConnector, incremental:
 
 
 @task(name="refresh_reporting_views")
-def refresh_reporting_views(snowflake: SnowflakeConnector) -> None:
+def refresh_reporting_views() -> None:
     """Refresh materialized views if needed"""
     logger = get_run_logger()
+    snowflake = SnowflakeConnector.load("snowflake-altapestdb")
     
     # List of views that might benefit from materialization
     critical_views = [
@@ -1246,9 +1251,10 @@ def refresh_reporting_views(snowflake: SnowflakeConnector) -> None:
 
 
 @task(name="validate_data_quality")
-def validate_data_quality(snowflake: SnowflakeConnector) -> Dict[str, any]:
+def validate_data_quality() -> Dict[str, any]:
     """Run data quality checks on transformed data"""
     logger = get_run_logger()
+    snowflake = SnowflakeConnector.load("snowflake-altapestdb")
     
     quality_checks = {
         "customer_orphans": """
@@ -1313,27 +1319,24 @@ def transform_raw_to_staging(
     logger = get_run_logger()
     logger.info(f"Starting transformation - Mode: {'Incremental' if incremental else 'Full'}")
     
-    # Get Snowflake connection
-    snowflake = SnowflakeConnector.load("snowflake-altapestdb")
-    
     # Create staging schema
-    create_staging_schema(snowflake)
+    create_staging_schema()
     
     # Transform dimension tables (always full refresh for dims)
-    transform_dimension_tables(snowflake)
+    transform_dimension_tables()
     
     # Transform core fact tables
-    transform_fact_tables(snowflake, incremental=incremental)
+    transform_fact_tables(incremental=incremental)
     
     # Transform additional fact tables
-    transform_additional_fact_tables(snowflake, incremental=incremental)
+    transform_additional_fact_tables(incremental=incremental)
     
     # Refresh/validate reporting views
-    refresh_reporting_views(snowflake)
+    refresh_reporting_views()
     
     # Run data quality checks
     if run_quality_checks:
-        quality_results = validate_data_quality(snowflake)
+        quality_results = validate_data_quality()
         logger.info(f"Data quality check results: {quality_results}")
     
     logger.info("Transformation completed successfully")
