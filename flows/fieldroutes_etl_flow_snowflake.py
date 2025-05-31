@@ -42,7 +42,7 @@ ENTITY_META = [
     ("route",          "ROUTE_FACT",          False, False, "dateUpdated", "date", {}),
     ("ticket",         "TICKET_FACT",         False, False, "dateUpdated", "dateCreated", {}),
     ("ticketItem",     "TICKETITEM_FACT",     False, False, "dateUpdated", "dateCreated", {}),
-    ("payment",        "PAYMENT_FACT",        False, False, "dateUpdated", "dateCreated", {}),
+    ("payment",        "PAYMENT_FACT",        False, False, "dateUpdated", "date", {}),
     ("appliedPayment", "APPLIEDPAYMENT_FACT", False, False, "dateUpdated", "dateApplied", {}),
     ("note",           "NOTE_FACT",           False, False, "dateUpdated", "dateAdded", {}),
     ("task",           "TASK_FACT",           False, False, "dateUpdated", "dateAdded", {}),
