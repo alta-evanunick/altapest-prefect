@@ -1593,12 +1593,12 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 "FACT_KNOCK": """
                     CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_KNOCK (
                         KnockID INTEGER PRIMARY KEY,
-                        KnockType INTEGER,
-                        EmployeeID INTEGER,
-                        ServiceID INTEGER,
                         DoorID INTEGER,
+                        EmployeeID INTEGER,
                         DateAdded TIMESTAMP_NTZ,
                         DateUpdated TIMESTAMP_NTZ,
+                        KnockType INTEGER,
+                        ServiceID INTEGER,
                         LoadDatetimeUTC TIMESTAMP_NTZ
                     )
                 """,
