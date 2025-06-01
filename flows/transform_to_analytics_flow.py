@@ -2018,7 +2018,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                                  THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateupdated::STRING) END as DateUpdated,
                             RawData:knocktype::INTEGER as KnockType,
                             RawData:serviceid::INTEGER as ServiceID,
-                            LoadDatetimeUTC TIMESTAMP_NTZ,
+                            LoadDatetimeUTC,
                             ROW_NUMBER() OVER (PARTITION BY RawData:knockid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                         FROM RAW_DB.FIELDROUTES.KNOCK_FACT
                         WHERE RawData:knockid IS NOT NULL
