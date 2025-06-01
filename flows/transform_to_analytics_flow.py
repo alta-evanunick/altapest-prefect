@@ -1548,6 +1548,12 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                         CheckType STRING,
                         BankAccountType STRING,
                         FailedAttempts INTEGER,
+                        SentFailureDate TIMESTAMP_NTZ,
+                        LastAttemptDate TIMESTAMP_NTZ,
+                        PaymentHoldDate DATE,
+                        RetryPoints INTEGER,
+                        InitialTransactionID STRING,
+                        LastDeclineType STRING,
                         LoadDatetimeUTC TIMESTAMP_NTZ
                     )
                 """,
