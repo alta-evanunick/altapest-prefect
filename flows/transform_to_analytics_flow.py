@@ -1299,14 +1299,13 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
         "FACT_KNOCK": """
             CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_KNOCK (
                 KnockID INTEGER PRIMARY KEY,
-                KnockType STRING,
-                OfficeID INTEGER,
-                DoorID INTEGER,
-                ServiceID INTEGER,
+                KnockType INTEGER,
                 EmployeeID INTEGER,
+                ServiceID INTEGER,
+                DoorID INTEGER,
                 DateAdded TIMESTAMP_NTZ,
                 DateUpdated TIMESTAMP_NTZ,
-                LoadDatetimeUTC TIMESTAMP_NTZ
+                LoadDatetimeUTC TIMESTAMP_NTZ,
             )
         """,
         
@@ -1594,14 +1593,13 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 "FACT_KNOCK": """
                     CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_KNOCK (
                         KnockID INTEGER PRIMARY KEY,
-                        OfficeID INTEGER,
-                        CustomerID INTEGER,
+                        KnockType INTEGER,
                         EmployeeID INTEGER,
-                        LeadID INTEGER,
-                        Result STRING,
-                        Outcome STRING,
-                        DateCreated TIMESTAMP_NTZ,
-                        LoadDatetimeUTC TIMESTAMP_NTZ
+                        ServiceID INTEGER,
+                        DoorID INTEGER,
+                        DateAdded TIMESTAMP_NTZ,
+                        DateUpdated TIMESTAMP_NTZ,
+                        LoadDatetimeUTC TIMESTAMP_NTZ,
                     )
                 """,
                 
@@ -2014,18 +2012,13 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                             RawData:knockid::INTEGER as KnockID,
                             RawData:doorid::INTEGER as DoorID,
                             RawData:employeeid::INTEGER as EmployeeID,
-                            RawData:officeid::INTEGER as OfficeID,
-                            CASE WHEN RawData:datecreated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:datecreated IS NULL 
-                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:datecreated::STRING) END as DateCreated,
-                            RawData:description::STRING as Description,
-                            RawData:result::STRING as Result,
-                            RawData:latitude::FLOAT as Latitude,
-                            RawData:longitude::FLOAT as Longitude,
-                            RawData:salestypeid::INTEGER as SalesTypeID,
-                            RawData:salescategoryid::INTEGER as SalesCategoryID,
-                            RawData:salesstatusid::INTEGER as SalesStatusID,
-                            RawData:appointmentid::INTEGER as AppointmentID,
-                            LoadDatetimeUTC,
+                            CASE WHEN RawData:dateadded::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateadded IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateadded::STRING) END as DateAdded,
+                            CASE WHEN RawData:dateupdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateupdated IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateupdated::STRING) END as DateUpdated,
+                            RawData:knocktype::INTEGER as KnockType,
+                            RawData:serviceid::INTEGER as ServiceID,
+                            LoadDatetimeUTC TIMESTAMP_NTZ,
                             ROW_NUMBER() OVER (PARTITION BY RawData:knockid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                         FROM RAW_DB.FIELDROUTES.KNOCK_FACT
                         WHERE RawData:knockid IS NOT NULL
@@ -2034,25 +2027,17 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                     WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
                         DoorID = src.DoorID,
                         EmployeeID = src.EmployeeID,
-                        OfficeID = src.OfficeID,
-                        DateCreated = src.DateCreated,
-                        Description = src.Description,
-                        Result = src.Result,
-                        Latitude = src.Latitude,
-                        Longitude = src.Longitude,
-                        SalesTypeID = src.SalesTypeID,
-                        SalesCategoryID = src.SalesCategoryID,
-                        SalesStatusID = src.SalesStatusID,
-                        AppointmentID = src.AppointmentID,
+                        DateAdded = src.DateAdded,
+                        DateUpdated = src.DateUpdated,
+                        KnockType = src.KnockType,
+                        ServiceID = src.ServiceID,
                         LoadDatetimeUTC = src.LoadDatetimeUTC
                     WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
-                        KnockID, DoorID, EmployeeID, OfficeID, DateCreated,
-                        Description, Result, Latitude, Longitude, SalesTypeID,
-                        SalesCategoryID, SalesStatusID, AppointmentID, LoadDatetimeUTC
+                        KnockID, DoorID, EmployeeID, DateAdded, DateUpdated,
+                        KnockType, ServiceID, LoadDatetimeUTC
                     ) VALUES (
-                        src.KnockID, src.DoorID, src.EmployeeID, src.OfficeID, src.DateCreated,
-                        src.Description, src.Result, src.Latitude, src.Longitude, src.SalesTypeID,
-                        src.SalesCategoryID, src.SalesStatusID, src.AppointmentID, src.LoadDatetimeUTC
+                        src.KnockID, src.DoorID, src.EmployeeID, src.DateAdded, src.DateUpdated,
+                        src.KnockType, src.ServiceID, src.LoadDatetimeUTC
                     )
                 """,
                 
