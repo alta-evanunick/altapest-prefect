@@ -1216,20 +1216,264 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 EmployeeID INTEGER,
                 EmployeeName STRING,
                 DateCreated TIMESTAMP_NTZ,
-                IsVisibleCustomer BOOLEAN,
-                IsVisibleTechnician BOOLEAN,
+                IsVisibleCustomer INTEGER,
+                IsVisibleTechnician INTEGER,
                 CancellationReasonID INTEGER,
                 CancellationReason STRING,
                 TypeID INTEGER,
                 TypeDescription STRING,
                 ContactTypeCategories VARIANT,
-                Text STRING,
+                NoteContent STRING,
                 ReferenceID INTEGER,
                 DateAdded TIMESTAMP_NTZ,
                 DateUpdated TIMESTAMP_NTZ,
                 OpenCount INTEGER,
                 ClickCount INTEGER,
                 EmailStatus STRING,
+                LoadDatetimeUTC TIMESTAMP_NTZ
+            )
+        """,
+        
+        "FACT_APPOINTMENTREMINDER": """
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_APPOINTMENTREMINDER (
+                ReminderID INTEGER PRIMARY KEY,
+                OfficeID INTEGER,
+                AppointmentID INTEGER,
+                ReminderText STRING,
+                ReminderDate TIMESTAMP_NTZ,
+                EmailDate TIMESTAMP_NTZ,
+                VoiceDate TIMESTAMP_NTZ,
+                Status STRING,
+                ResponseText STRING,
+                ResponseDate TIMESTAMP_NTZ,
+                SentToSMS STRING,
+                SentToEmail STRING,
+                SentToPhone STRING,
+                DateUpdated TIMESTAMP_NTZ,
+                LoadDatetimeUTC TIMESTAMP_NTZ
+            )
+        """,
+        
+        "FACT_PAYMENTPROFILE": """
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_PAYMENTPROFILE (
+                PaymentProfileID INTEGER PRIMARY KEY,
+                CustomerID INTEGER,
+                OfficeID INTEGER,
+                CreatedByEmployeeID INTEGER,
+                PaymentDescription STRING,
+                DateCreated TIMESTAMP_NTZ,
+                DateUpdated TIMESTAMP_NTZ,
+                Status STRING,
+                StatusNotes STRING,
+                BillingName STRING,
+                BillingAddress STRING,
+                BillingCity STRING,
+                BillingState STRING,
+                BillingZip STRING,
+                BillingPhone STRING,
+                BillingEmail STRING,
+                PaymentMethod STRING,
+                GatewayName STRING,
+                MerchantID STRING,
+                MerchantToken STRING,
+                LastFour STRING,
+                ExpMonth INTEGER,
+                ExpYear INTEGER,
+                CardType STRING,
+                BankName STRING,
+                BankAccountNumber STRING,
+                BankRoutingNumber STRING,
+                BankAccountType STRING,
+                BankType STRING,
+                FailedAttempts INTEGER,
+                SentFailureDate TIMESTAMP_NTZ,
+                LastAttemptDate TIMESTAMP_NTZ,
+                PaymentHoldDate DATE,
+                RetryPoints INTEGER,
+                InitialTransactionID STRING,
+                LastDeclineType STRING,
+                LoadDatetimeUTC TIMESTAMP_NTZ
+            )
+        """,
+        
+        "FACT_KNOCK": """
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_KNOCK (
+                KnockID INTEGER PRIMARY KEY,
+                KnockType STRING,
+                DoorID INTEGER,
+                ServiceID INTEGER,
+                EmployeeID INTEGER,
+                DateAdded TIMESTAMP_NTZ,
+                DateUpdated TIMESTAMP_NTZ,
+                LoadDatetimeUTC TIMESTAMP_NTZ
+            )
+        """,
+        
+        "FACT_GENERICFLAGASSIGNMENT": """
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_GENERICFLAGASSIGNMENT (
+                GenericFlagAssignmentIDs VARIANT,
+                GenericFlagIDs VARIANT,
+                EntityIDs VARIANT,
+                FlagType STRING,
+                OfficeID INTEGER,
+                DateCreated TIMESTAMP_NTZ,
+                DateUpdated TIMESTAMP_NTZ,
+                LoadDatetimeUTC TIMESTAMP_NTZ
+            )
+        """,
+        
+        "FACT_DISBURSEMENTITEM": """
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_DISBURSEMENTITEM (
+                GatewayDisbursementEntryID INTEGER PRIMARY KEY,
+                GatewayDisbursementID INTEGER,
+                DateCreated TIMESTAMP_NTZ,
+                DateUpdated TIMESTAMP_NTZ,
+                BillingFirstName STRING,
+                BillingLastName STRING,
+                Amount FLOAT,
+                ActualAmount FLOAT,
+                Description STRING,
+                IsFee INTEGER,
+                GatewayEventID STRING,
+                GatewayEventType STRING,
+                GatewayEventFeeType STRING,
+                GatewayEventDescription STRING,
+                LoadDatetimeUTC TIMESTAMP_NTZ
+            )
+        """,
+        
+        "FACT_ADDITIONALCONTACTS": """
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_ADDITIONALCONTACTS (
+                AdditionalContactID INTEGER PRIMARY KEY,
+                AdditionalContactTypeID INTEGER,
+                CustomerID INTEGER,
+                FName STRING,
+                LName STRING,
+                Address STRING,
+                City STRING,
+                State STRING,
+                Zip STRING,
+                Phone1 STRING,
+                Phone1Ext STRING,
+                Phone2 STRING,
+                Phone2Ext STRING,
+                Email STRING,
+                OptInSMS INTEGER,
+                OptInPhone INTEGER,
+                OptInEmail INTEGER,
+                ContactType STRING,
+                DateUpdated TIMESTAMP_NTZ,
+                DateCreated TIMESTAMP_NTZ,
+                AddedByEmployeeID INTEGER,
+                EditedByEmployeeID INTEGER,
+                CompanyName STRING,
+                Visibility STRING,
+                BusinessContactID INTEGER,
+                TermiteReportID INTEGER,
+                IsWDO INTEGER,
+                IsWDOPartyOfInterest INTEGER,
+                WDOReportSentTo STRING,
+                WDOEmailOnly INTEGER,
+                Description STRING,
+                LoadDatetimeUTC TIMESTAMP_NTZ
+            )
+        """,
+        
+        "FACT_CHARGEBACK": """
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_CHARGEBACK (
+                GatewayChargebackID INTEGER PRIMARY KEY,
+                OfficeID INTEGER,
+                DateCreated TIMESTAMP_NTZ,
+                DateUpdated TIMESTAMP_NTZ,
+                ChargebackAmount FLOAT,
+                ChargebackReasonCode STRING,
+                PaymentID INTEGER,
+                GatewayBillingName STRING,
+                LoadDatetimeUTC TIMESTAMP_NTZ
+            )
+        """,
+        
+        "FACT_DISBURSEMENT": """
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_DISBURSEMENT (
+                GatewayDisbursementIDs VARIANT,
+                DateCreated TIMESTAMP_NTZ,
+                DateUpdated TIMESTAMP_NTZ,
+                Amount FLOAT,
+                LoadDatetimeUTC TIMESTAMP_NTZ
+            )
+        """,
+        
+        "FACT_DOOR": """
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_DOOR (
+                DoorID INTEGER PRIMARY KEY,
+                OfficeID INTEGER,
+                Latitude FLOAT,
+                Longitude FLOAT,
+                DateCreated TIMESTAMP_NTZ,
+                EmployeeID INTEGER,
+                Name STRING,
+                Address STRING,
+                City STRING,
+                State STRING,
+                Zip STRING,
+                Phone STRING,
+                Status STRING,
+                Notes STRING,
+                Email STRING,
+                CallbackTime STRING,
+                KnockCounter INTEGER,
+                LoadDatetimeUTC TIMESTAMP_NTZ
+            )
+        """,
+        
+        "FACT_TICKETITEM": """
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_TICKETITEM (
+                TicketID INTEGER,
+                CustomerID INTEGER,
+                BillToAccountID INTEGER,
+                OfficeID INTEGER,
+                DateCreated TIMESTAMP_NTZ,
+                TicketDate DATE,
+                DateUpdated TIMESTAMP_NTZ,
+                IsActive BOOLEAN,
+                Subtotal FLOAT,
+                TaxAmount FLOAT,
+                Total FLOAT,
+                ServiceCharge FLOAT,
+                ServiceTaxable INTEGER,
+                ProductionValue FLOAT,
+                TaxRate FLOAT,
+                AppointmentID INTEGER,
+                RemainingBalance FLOAT,
+                SubscriptionID INTEGER,
+                ServiceID INTEGER,
+                ItemArray VARIANT,
+                GLNumber STRING,
+                CreatedByEmployeeID INTEGER,
+                LoadDatetimeUTC TIMESTAMP_NTZ
+            )
+        """,
+        
+        "FACT_TASK": """
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_TASK (
+                TaskID INTEGER PRIMARY KEY,
+                OfficeID INTEGER,
+                CustomerID INTEGER,
+                AddedByEmployeeID INTEGER,
+                AssignedToEmployeeID INTEGER,
+                CompletedByEmployeeID INTEGER,
+                Type STRING,
+                DueDate TIMESTAMP_NTZ,
+                DateAdded TIMESTAMP_NTZ,
+                DateCompleted TIMESTAMP_NTZ,
+                CategoryID INTEGER,
+                CategoryDescription STRING,
+                Description STRING,
+                CompletionNotes STRING,
+                ReferenceID INTEGER,
+                Phone STRING,
+                DateUpdated TIMESTAMP_NTZ,
+                Status STRING,
                 LoadDatetimeUTC TIMESTAMP_NTZ
             )
         """
@@ -1245,6 +1489,697 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
             
             # Then run merges
             for table_name, merge_sql in additional_transformations.items():
+                logger.info(f"Transforming {table_name}")
+                cursor.execute(merge_sql)
+                logger.info(f"Completed {table_name} transformation")
+            
+            # Transform the new missing tables
+            missing_table_transformations = {
+                "FACT_APPOINTMENTREMINDER": f"""
+                    MERGE INTO STAGING_DB.FIELDROUTES.FACT_APPOINTMENTREMINDER tgt
+                    USING (
+                        SELECT DISTINCT
+                            RawData:reminderid::INTEGER as ReminderID,
+                            RawData:officeid::INTEGER as OfficeID,
+                            RawData:appointmentid::INTEGER as AppointmentID,
+                            RawData:text::STRING as ReminderText,
+                            CASE WHEN RawData:datesent::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:datesent IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:datesent::STRING) END as ReminderDate,
+                            CASE WHEN RawData:emailsent::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:emailsent IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:emailsent::STRING) END as EmailDate,
+                            CASE WHEN RawData:voicesent::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:voicesent IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:voicesent::STRING) END as VoiceDate,
+                            RawData:status::STRING as Status,
+                            RawData:response::STRING as ResponseText,
+                            CASE WHEN RawData:responsetime::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:responsetime IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:responsetime::STRING) END as ResponseDate,
+                            RawData:sendto::STRING as SentToSMS,
+                            RawData:emailaddress::STRING as SentToEmail,
+                            RawData:voicenumber::STRING as SentToPhone,
+                            CASE WHEN RawData:dateupdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateupdated IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateupdated::STRING) END as DateUpdated,
+                            LoadDatetimeUTC,
+                            ROW_NUMBER() OVER (PARTITION BY RawData:reminderid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
+                        FROM RAW_DB.FIELDROUTES.APPOINTMENTREMINDER_FACT
+                        {where_clause}
+                    ) src
+                    ON tgt.ReminderID = src.ReminderID
+                    WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
+                        OfficeID = src.OfficeID,
+                        AppointmentID = src.AppointmentID,
+                        ReminderText = src.ReminderText,
+                        ReminderDate = src.ReminderDate,
+                        EmailDate = src.EmailDate,
+                        VoiceDate = src.VoiceDate,
+                        Status = src.Status,
+                        ResponseText = src.ResponseText,
+                        ResponseDate = src.ResponseDate,
+                        SentToSMS = src.SentToSMS,
+                        SentToEmail = src.SentToEmail,
+                        SentToPhone = src.SentToPhone,
+                        DateUpdated = src.DateUpdated,
+                        LoadDatetimeUTC = src.LoadDatetimeUTC
+                    WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
+                        ReminderID, OfficeID, AppointmentID, ReminderText, ReminderDate,
+                        EmailDate, VoiceDate, Status, ResponseText, ResponseDate,
+                        SentToSMS, SentToEmail, SentToPhone, DateUpdated, LoadDatetimeUTC
+                    ) VALUES (
+                        src.ReminderID, src.OfficeID, src.AppointmentID, src.ReminderText, src.ReminderDate,
+                        src.EmailDate, src.VoiceDate, src.Status, src.ResponseText, src.ResponseDate,
+                        src.SentToSMS, src.SentToEmail, src.SentToPhone, src.DateUpdated, src.LoadDatetimeUTC
+                    )
+                """,
+                
+                "FACT_PAYMENTPROFILE": f"""
+                    MERGE INTO STAGING_DB.FIELDROUTES.FACT_PAYMENTPROFILE tgt
+                    USING (
+                        SELECT DISTINCT
+                            RawData:paymentprofileid::INTEGER as PaymentProfileID,
+                            RawData:customerid::INTEGER as CustomerID,
+                            RawData:officeid::INTEGER as OfficeID,
+                            RawData:createdby::INTEGER as CreatedByEmployeeID,
+                            RawData:description::STRING as PaymentDescription,
+                            CASE WHEN RawData:datecreated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:datecreated IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:datecreated::STRING) END as DateCreated,
+                            CASE WHEN RawData:dateupdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateupdated IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateupdated::STRING) END as DateUpdated,
+                            RawData:status::STRING as Status,
+                            RawData:statusnotes::STRING as StatusNotes,
+                            RawData:billingname::STRING as BillingName,
+                            RawData:billingaddress1::STRING as BillingAddress,
+                            RawData:billingcity::STRING as BillingCity,
+                            RawData:billingstate::STRING as BillingState,
+                            RawData:billingzip::STRING as BillingZip,
+                            RawData:billingphone::STRING as BillingPhone,
+                            RawData:billingemail::STRING as BillingEmail,
+                            RawData:paymentmethod::STRING as PaymentMethod,
+                            RawData:gateway::STRING as GatewayName,
+                            RawData:merchantid::STRING as MerchantID,
+                            RawData:merchanttoken::STRING as MerchantToken,
+                            RawData:lastfour::STRING as LastFour,
+                            RawData:expmonth::INTEGER as ExpMonth,
+                            RawData:expyear::INTEGER as ExpYear,
+                            RawData:cardtype::STRING as CardType,
+                            RawData:bankname::STRING as BankName,
+                            RawData:accountnumber::STRING as BankAccountNumber,
+                            RawData:routingnumber::STRING as BankRoutingNumber,
+                            RawData:checktype::STRING as BankAccountType,
+                            RawData:accounttype::STRING as BankType,
+                            RawData:failedattempts::INTEGER as FailedAttempts,
+                            CASE WHEN RawData:sentfailuredate::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:sentfailuredate IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:sentfailuredate::STRING) END as SentFailureDate,
+                            CASE WHEN RawData:lastattemptdate::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:lastattemptdate IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:lastattemptdate::STRING) END as LastAttemptDate,
+                            CASE WHEN RawData:paymentholddate::STRING IN ('0000-00-00', '', '0000-00-00 00:00:00') OR RawData:paymentholddate IS NULL 
+                                 THEN NULL ELSE TRY_TO_DATE(RawData:paymentholddate::STRING) END as PaymentHoldDate,
+                            RawData:retrypoints::INTEGER as RetryPoints,
+                            RawData:initialtransactionid::STRING as InitialTransactionID,
+                            RawData:lastdeclinetype::STRING as LastDeclineType,
+                            LoadDatetimeUTC,
+                            ROW_NUMBER() OVER (PARTITION BY RawData:paymentprofileid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
+                        FROM RAW_DB.FIELDROUTES.PAYMENTPROFILE_FACT
+                        {where_clause}
+                    ) src
+                    ON tgt.PaymentProfileID = src.PaymentProfileID
+                    WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
+                        CustomerID = src.CustomerID,
+                        OfficeID = src.OfficeID,
+                        CreatedByEmployeeID = src.CreatedByEmployeeID,
+                        PaymentDescription = src.PaymentDescription,
+                        DateCreated = src.DateCreated,
+                        DateUpdated = src.DateUpdated,
+                        Status = src.Status,
+                        StatusNotes = src.StatusNotes,
+                        BillingName = src.BillingName,
+                        BillingAddress = src.BillingAddress,
+                        BillingCity = src.BillingCity,
+                        BillingState = src.BillingState,
+                        BillingZip = src.BillingZip,
+                        BillingPhone = src.BillingPhone,
+                        BillingEmail = src.BillingEmail,
+                        PaymentMethod = src.PaymentMethod,
+                        GatewayName = src.GatewayName,
+                        MerchantID = src.MerchantID,
+                        MerchantToken = src.MerchantToken,
+                        LastFour = src.LastFour,
+                        ExpMonth = src.ExpMonth,
+                        ExpYear = src.ExpYear,
+                        CardType = src.CardType,
+                        BankName = src.BankName,
+                        BankAccountNumber = src.BankAccountNumber,
+                        BankRoutingNumber = src.BankRoutingNumber,
+                        BankAccountType = src.BankAccountType,
+                        BankType = src.BankType,
+                        FailedAttempts = src.FailedAttempts,
+                        SentFailureDate = src.SentFailureDate,
+                        LastAttemptDate = src.LastAttemptDate,
+                        PaymentHoldDate = src.PaymentHoldDate,
+                        RetryPoints = src.RetryPoints,
+                        InitialTransactionID = src.InitialTransactionID,
+                        LastDeclineType = src.LastDeclineType,
+                        LoadDatetimeUTC = src.LoadDatetimeUTC
+                    WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
+                        PaymentProfileID, CustomerID, OfficeID, CreatedByEmployeeID, PaymentDescription,
+                        DateCreated, DateUpdated, Status, StatusNotes, BillingName,
+                        BillingAddress, BillingCity, BillingState, BillingZip, BillingPhone,
+                        BillingEmail, PaymentMethod, GatewayName, MerchantID, MerchantToken,
+                        LastFour, ExpMonth, ExpYear, CardType, BankName,
+                        BankAccountNumber, BankRoutingNumber, BankAccountType, BankType, FailedAttempts,
+                        SentFailureDate, LastAttemptDate, PaymentHoldDate, RetryPoints, InitialTransactionID,
+                        LastDeclineType, LoadDatetimeUTC
+                    ) VALUES (
+                        src.PaymentProfileID, src.CustomerID, src.OfficeID, src.CreatedByEmployeeID, src.PaymentDescription,
+                        src.DateCreated, src.DateUpdated, src.Status, src.StatusNotes, src.BillingName,
+                        src.BillingAddress, src.BillingCity, src.BillingState, src.BillingZip, src.BillingPhone,
+                        src.BillingEmail, src.PaymentMethod, src.GatewayName, src.MerchantID, src.MerchantToken,
+                        src.LastFour, src.ExpMonth, src.ExpYear, src.CardType, src.BankName,
+                        src.BankAccountNumber, src.BankRoutingNumber, src.BankAccountType, src.BankType, src.FailedAttempts,
+                        src.SentFailureDate, src.LastAttemptDate, src.PaymentHoldDate, src.RetryPoints, src.InitialTransactionID,
+                        src.LastDeclineType, src.LoadDatetimeUTC
+                    )
+                """,
+                
+                "FACT_ROUTE": f"""
+                    MERGE INTO STAGING_DB.FIELDROUTES.FACT_ROUTE tgt
+                    USING (
+                        SELECT DISTINCT
+                            RawData:routeid::INTEGER as RouteID,
+                            RawData:title::STRING as RouteTitle,
+                            RawData:templateid::INTEGER as RouteTemplateID,
+                            CASE WHEN RawData:dateadded::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateadded IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateadded::STRING) END as DateAdded,
+                            RawData:addedby::INTEGER as AddedByEmployeeID,
+                            RawData:officeid::INTEGER as OfficeID,
+                            RawData:groupid::INTEGER as RouteGroupID,
+                            RawData:grouptitle::STRING as RouteGroupTitle,
+                            CASE WHEN RawData:date::STRING IN ('0000-00-00', '', '0000-00-00 00:00:00') OR RawData:date IS NULL 
+                                 THEN NULL ELSE TRY_TO_DATE(RawData:date::STRING) END as RouteDate,
+                            RawData:daynotes::STRING as DayNotes,
+                            RawData:dayalert::STRING as DayAlert,
+                            RawData:dayid::INTEGER as DayID,
+                            RawData:additionaltechs::VARIANT as AdditionalTechs,
+                            RawData:assignedtech::INTEGER as AssignedTech,
+                            RawData:apicanschedule::INTEGER as APICanSchedule,
+                            RawData:scheduleteams::VARIANT as ScheduleTeams,
+                            RawData:scheduletypes::VARIANT as ScheduleTypes,
+                            RawData:averagelatitude::FLOAT as AvgLatitude,
+                            RawData:averagelongitude::FLOAT as AvgLongitude,
+                            RawData:averagedistance::FLOAT as AvgDistance,
+                            CASE WHEN RawData:dateupdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateupdated IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateupdated::STRING) END as DateUpdated,
+                            RawData:distancescore::FLOAT as DistanceScore,
+                            RawData:estimatedappointmentsdurationminutes::INTEGER as AppointmentDurationEstimate,
+                            RawData:estimateddrivingdurationseconds::INTEGER as DrivingDurationEstimate,
+                            RawData:capacityestimatevalue::FLOAT as CapacityValueEstimate,
+                            RawData:lockedroute::INTEGER as IsLocked,
+                            RawData:totaldistance::FLOAT as TotalDistance,
+                            LoadDatetimeUTC,
+                            ROW_NUMBER() OVER (PARTITION BY RawData:routeid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
+                        FROM RAW_DB.FIELDROUTES.ROUTE_FACT
+                        {where_clause}
+                    ) src
+                    ON tgt.RouteID = src.RouteID
+                    WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
+                        RouteTitle = src.RouteTitle,
+                        RouteTemplateID = src.RouteTemplateID,
+                        DateAdded = src.DateAdded,
+                        AddedByEmployeeID = src.AddedByEmployeeID,
+                        OfficeID = src.OfficeID,
+                        RouteGroupID = src.RouteGroupID,
+                        RouteGroupTitle = src.RouteGroupTitle,
+                        RouteDate = src.RouteDate,
+                        DayNotes = src.DayNotes,
+                        DayAlert = src.DayAlert,
+                        DayID = src.DayID,
+                        AdditionalTechs = src.AdditionalTechs,
+                        AssignedTech = src.AssignedTech,
+                        APICanSchedule = src.APICanSchedule,
+                        ScheduleTeams = src.ScheduleTeams,
+                        ScheduleTypes = src.ScheduleTypes,
+                        AvgLatitude = src.AvgLatitude,
+                        AvgLongitude = src.AvgLongitude,
+                        AvgDistance = src.AvgDistance,
+                        DateUpdated = src.DateUpdated,
+                        DistanceScore = src.DistanceScore,
+                        AppointmentDurationEstimate = src.AppointmentDurationEstimate,
+                        DrivingDurationEstimate = src.DrivingDurationEstimate,
+                        CapacityValueEstimate = src.CapacityValueEstimate,
+                        IsLocked = src.IsLocked,
+                        TotalDistance = src.TotalDistance,
+                        LoadDatetimeUTC = src.LoadDatetimeUTC
+                    WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
+                        RouteID, RouteTitle, RouteTemplateID, DateAdded, AddedByEmployeeID,
+                        OfficeID, RouteGroupID, RouteGroupTitle, RouteDate, DayNotes,
+                        DayAlert, DayID, AdditionalTechs, AssignedTech, APICanSchedule,
+                        ScheduleTeams, ScheduleTypes, AvgLatitude, AvgLongitude, AvgDistance,
+                        DateUpdated, DistanceScore, AppointmentDurationEstimate, DrivingDurationEstimate, CapacityValueEstimate,
+                        IsLocked, TotalDistance, LoadDatetimeUTC
+                    ) VALUES (
+                        src.RouteID, src.RouteTitle, src.RouteTemplateID, src.DateAdded, src.AddedByEmployeeID,
+                        src.OfficeID, src.RouteGroupID, src.RouteGroupTitle, src.RouteDate, src.DayNotes,
+                        src.DayAlert, src.DayID, src.AdditionalTechs, src.AssignedTech, src.APICanSchedule,
+                        src.ScheduleTeams, src.ScheduleTypes, src.AvgLatitude, src.AvgLongitude, src.AvgDistance,
+                        src.DateUpdated, src.DistanceScore, src.AppointmentDurationEstimate, src.DrivingDurationEstimate, src.CapacityValueEstimate,
+                        src.IsLocked, src.TotalDistance, src.LoadDatetimeUTC
+                    )
+                """,
+                
+                "FACT_KNOCK": f"""
+                    MERGE INTO STAGING_DB.FIELDROUTES.FACT_KNOCK tgt
+                    USING (
+                        SELECT DISTINCT
+                            RawData:knockid::INTEGER as KnockID,
+                            RawData:doorid::INTEGER as DoorID,
+                            RawData:employeeid::INTEGER as EmployeeID,
+                            RawData:officeid::INTEGER as OfficeID,
+                            CASE WHEN RawData:datecreated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:datecreated IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:datecreated::STRING) END as DateCreated,
+                            RawData:description::STRING as Description,
+                            RawData:result::STRING as Result,
+                            RawData:latitude::FLOAT as Latitude,
+                            RawData:longitude::FLOAT as Longitude,
+                            RawData:salestypeid::INTEGER as SalesTypeID,
+                            RawData:salescategoryid::INTEGER as SalesCategoryID,
+                            RawData:salesstatusid::INTEGER as SalesStatusID,
+                            RawData:appointmentid::INTEGER as AppointmentID,
+                            LoadDatetimeUTC,
+                            ROW_NUMBER() OVER (PARTITION BY RawData:knockid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
+                        FROM RAW_DB.FIELDROUTES.KNOCK_FACT
+                        WHERE RawData:knockid IS NOT NULL
+                    ) src ON tgt.KnockID = src.KnockID
+                    WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
+                        DoorID = src.DoorID,
+                        EmployeeID = src.EmployeeID,
+                        OfficeID = src.OfficeID,
+                        DateCreated = src.DateCreated,
+                        Description = src.Description,
+                        Result = src.Result,
+                        Latitude = src.Latitude,
+                        Longitude = src.Longitude,
+                        SalesTypeID = src.SalesTypeID,
+                        SalesCategoryID = src.SalesCategoryID,
+                        SalesStatusID = src.SalesStatusID,
+                        AppointmentID = src.AppointmentID,
+                        LoadDatetimeUTC = src.LoadDatetimeUTC
+                    WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
+                        KnockID, DoorID, EmployeeID, OfficeID, DateCreated,
+                        Description, Result, Latitude, Longitude, SalesTypeID,
+                        SalesCategoryID, SalesStatusID, AppointmentID, LoadDatetimeUTC
+                    ) VALUES (
+                        src.KnockID, src.DoorID, src.EmployeeID, src.OfficeID, src.DateCreated,
+                        src.Description, src.Result, src.Latitude, src.Longitude, src.SalesTypeID,
+                        src.SalesCategoryID, src.SalesStatusID, src.AppointmentID, src.LoadDatetimeUTC
+                    )
+                """,
+                
+                "FACT_GENERICFLAGASSIGNMENT": f"""
+                    MERGE INTO STAGING_DB.FIELDROUTES.FACT_GENERICFLAGASSIGNMENT tgt
+                    USING (
+                        SELECT DISTINCT
+                            RawData:genericflagassignmentid::INTEGER as GenericFlagAssignmentID,
+                            RawData:officeid::INTEGER as OfficeID,
+                            RawData:genericflagid::INTEGER as GenericFlagID,
+                            RawData:relatedtablerecordid::INTEGER as RelatedTableRecordID,
+                            RawData:tablename::STRING as TableName,
+                            RawData:assignedbyemployeeid::INTEGER as AssignedByEmployeeID,
+                            CASE WHEN RawData:dateassigned::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateassigned IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateassigned::STRING) END as DateAssigned,
+                            LoadDatetimeUTC,
+                            ROW_NUMBER() OVER (PARTITION BY RawData:genericflagassignmentid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
+                        FROM RAW_DB.FIELDROUTES.GENERICFLAGASSIGNMENT_FACT
+                        WHERE RawData:genericflagassignmentid IS NOT NULL
+                    ) src ON tgt.GenericFlagAssignmentID = src.GenericFlagAssignmentID
+                    WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
+                        OfficeID = src.OfficeID,
+                        GenericFlagID = src.GenericFlagID,
+                        RelatedTableRecordID = src.RelatedTableRecordID,
+                        TableName = src.TableName,
+                        AssignedByEmployeeID = src.AssignedByEmployeeID,
+                        DateAssigned = src.DateAssigned,
+                        LoadDatetimeUTC = src.LoadDatetimeUTC
+                    WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
+                        GenericFlagAssignmentID, OfficeID, GenericFlagID, RelatedTableRecordID, TableName,
+                        AssignedByEmployeeID, DateAssigned, LoadDatetimeUTC
+                    ) VALUES (
+                        src.GenericFlagAssignmentID, src.OfficeID, src.GenericFlagID, src.RelatedTableRecordID, src.TableName,
+                        src.AssignedByEmployeeID, src.DateAssigned, src.LoadDatetimeUTC
+                    )
+                """,
+                
+                "FACT_DISBURSEMENTITEM": f"""
+                    MERGE INTO STAGING_DB.FIELDROUTES.FACT_DISBURSEMENTITEM tgt
+                    USING (
+                        SELECT DISTINCT
+                            RawData:disbursementitemid::INTEGER as DisbursementItemID,
+                            RawData:disbursementid::INTEGER as DisbursementID,
+                            RawData:ticketitemid::INTEGER as TicketItemID,
+                            RawData:amount::FLOAT as Amount,
+                            LoadDatetimeUTC,
+                            ROW_NUMBER() OVER (PARTITION BY RawData:disbursementitemid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
+                        FROM RAW_DB.FIELDROUTES.DISBURSEMENTITEM_FACT
+                        WHERE RawData:disbursementitemid IS NOT NULL
+                    ) src ON tgt.DisbursementItemID = src.DisbursementItemID
+                    WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
+                        DisbursementID = src.DisbursementID,
+                        TicketItemID = src.TicketItemID,
+                        Amount = src.Amount,
+                        LoadDatetimeUTC = src.LoadDatetimeUTC
+                    WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
+                        DisbursementItemID, DisbursementID, TicketItemID, Amount, LoadDatetimeUTC
+                    ) VALUES (
+                        src.DisbursementItemID, src.DisbursementID, src.TicketItemID, src.Amount, src.LoadDatetimeUTC
+                    )
+                """,
+                
+                "FACT_ADDITIONALCONTACTS": f"""
+                    MERGE INTO STAGING_DB.FIELDROUTES.FACT_ADDITIONALCONTACTS tgt
+                    USING (
+                        SELECT DISTINCT
+                            RawData:additionalcontactid::INTEGER as AdditionalContactID,
+                            RawData:customerid::INTEGER as CustomerID,
+                            RawData:name::STRING as Name,
+                            RawData:phone::STRING as Phone,
+                            RawData:relationship::STRING as Relationship,
+                            RawData:isactive::BOOLEAN as IsActive,
+                            LoadDatetimeUTC,
+                            ROW_NUMBER() OVER (PARTITION BY RawData:additionalcontactid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
+                        FROM RAW_DB.FIELDROUTES.ADDITIONALCONTACTS_FACT
+                        WHERE RawData:additionalcontactid IS NOT NULL
+                    ) src ON tgt.AdditionalContactID = src.AdditionalContactID
+                    WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
+                        CustomerID = src.CustomerID,
+                        Name = src.Name,
+                        Phone = src.Phone,
+                        Relationship = src.Relationship,
+                        IsActive = src.IsActive,
+                        LoadDatetimeUTC = src.LoadDatetimeUTC
+                    WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
+                        AdditionalContactID, CustomerID, Name, Phone, Relationship,
+                        IsActive, LoadDatetimeUTC
+                    ) VALUES (
+                        src.AdditionalContactID, src.CustomerID, src.Name, src.Phone, src.Relationship,
+                        src.IsActive, src.LoadDatetimeUTC
+                    )
+                """,
+                
+                "FACT_CHARGEBACK": f"""
+                    MERGE INTO STAGING_DB.FIELDROUTES.FACT_CHARGEBACK tgt
+                    USING (
+                        SELECT DISTINCT
+                            RawData:chargebackid::INTEGER as ChargebackID,
+                            RawData:transactionid::INTEGER as TransactionID,
+                            RawData:officeid::INTEGER as OfficeID,
+                            RawData:customerid::INTEGER as CustomerID,
+                            RawData:transactiontype::STRING as TransactionType,
+                            RawData:responsedescription::STRING as ResponseDescription,
+                            RawData:status::STRING as Status,
+                            CASE WHEN RawData:datecreated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:datecreated IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:datecreated::STRING) END as DateCreated,
+                            CASE WHEN RawData:dateupdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateupdated IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateupdated::STRING) END as DateUpdated,
+                            RawData:amount::FLOAT as Amount,
+                            LoadDatetimeUTC,
+                            ROW_NUMBER() OVER (PARTITION BY RawData:chargebackid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
+                        FROM RAW_DB.FIELDROUTES.CHARGEBACK_FACT
+                        WHERE RawData:chargebackid IS NOT NULL
+                    ) src ON tgt.ChargebackID = src.ChargebackID
+                    WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
+                        TransactionID = src.TransactionID,
+                        OfficeID = src.OfficeID,
+                        CustomerID = src.CustomerID,
+                        TransactionType = src.TransactionType,
+                        ResponseDescription = src.ResponseDescription,
+                        Status = src.Status,
+                        DateCreated = src.DateCreated,
+                        DateUpdated = src.DateUpdated,
+                        Amount = src.Amount,
+                        LoadDatetimeUTC = src.LoadDatetimeUTC
+                    WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
+                        ChargebackID, TransactionID, OfficeID, CustomerID, TransactionType,
+                        ResponseDescription, Status, DateCreated, DateUpdated, Amount,
+                        LoadDatetimeUTC
+                    ) VALUES (
+                        src.ChargebackID, src.TransactionID, src.OfficeID, src.CustomerID, src.TransactionType,
+                        src.ResponseDescription, src.Status, src.DateCreated, src.DateUpdated, src.Amount,
+                        src.LoadDatetimeUTC
+                    )
+                """,
+                
+                "FACT_DISBURSEMENT": f"""
+                    MERGE INTO STAGING_DB.FIELDROUTES.FACT_DISBURSEMENT tgt
+                    USING (
+                        SELECT DISTINCT
+                            RawData:disbursementid::INTEGER as DisbursementID,
+                            RawData:employeeid::INTEGER as EmployeeID,
+                            RawData:officeid::INTEGER as OfficeID,
+                            RawData:description::STRING as Description,
+                            RawData:paymentmethod::STRING as PaymentMethod,
+                            RawData:status::STRING as Status,
+                            CASE WHEN RawData:datecreated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:datecreated IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:datecreated::STRING) END as DateCreated,
+                            CASE WHEN RawData:dateupdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateupdated IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateupdated::STRING) END as DateUpdated,
+                            CASE WHEN RawData:datecompleted::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:datecompleted IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:datecompleted::STRING) END as DateCompleted,
+                            RawData:checknumber::STRING as CheckNumber,
+                            RawData:subtotal::FLOAT as Subtotal,
+                            RawData:tax::FLOAT as Tax,
+                            RawData:grandtotal::FLOAT as GrandTotal,
+                            RawData:statusnotes::STRING as StatusNotes,
+                            RawData:payerid::INTEGER as PayerID,
+                            RawData:payertype::STRING as PayerType,
+                            LoadDatetimeUTC,
+                            ROW_NUMBER() OVER (PARTITION BY RawData:disbursementid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
+                        FROM RAW_DB.FIELDROUTES.DISBURSEMENT_FACT
+                        WHERE RawData:disbursementid IS NOT NULL
+                    ) src ON tgt.DisbursementID = src.DisbursementID
+                    WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
+                        EmployeeID = src.EmployeeID,
+                        OfficeID = src.OfficeID,
+                        Description = src.Description,
+                        PaymentMethod = src.PaymentMethod,
+                        Status = src.Status,
+                        DateCreated = src.DateCreated,
+                        DateUpdated = src.DateUpdated,
+                        DateCompleted = src.DateCompleted,
+                        CheckNumber = src.CheckNumber,
+                        Subtotal = src.Subtotal,
+                        Tax = src.Tax,
+                        GrandTotal = src.GrandTotal,
+                        StatusNotes = src.StatusNotes,
+                        PayerID = src.PayerID,
+                        PayerType = src.PayerType,
+                        LoadDatetimeUTC = src.LoadDatetimeUTC
+                    WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
+                        DisbursementID, EmployeeID, OfficeID, Description, PaymentMethod,
+                        Status, DateCreated, DateUpdated, DateCompleted, CheckNumber,
+                        Subtotal, Tax, GrandTotal, StatusNotes, PayerID,
+                        PayerType, LoadDatetimeUTC
+                    ) VALUES (
+                        src.DisbursementID, src.EmployeeID, src.OfficeID, src.Description, src.PaymentMethod,
+                        src.Status, src.DateCreated, src.DateUpdated, src.DateCompleted, src.CheckNumber,
+                        src.Subtotal, src.Tax, src.GrandTotal, src.StatusNotes, src.PayerID,
+                        src.PayerType, src.LoadDatetimeUTC
+                    )
+                """,
+                
+                "FACT_DOOR": f"""
+                    MERGE INTO STAGING_DB.FIELDROUTES.FACT_DOOR tgt
+                    USING (
+                        SELECT DISTINCT
+                            RawData:doorid::INTEGER as DoorID,
+                            RawData:officeid::INTEGER as OfficeID,
+                            RawData:latitude::FLOAT as Latitude,
+                            RawData:longitude::FLOAT as Longitude,
+                            CASE WHEN RawData:datecreated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:datecreated IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:datecreated::STRING) END as DateCreated,
+                            RawData:employeeid::INTEGER as EmployeeID,
+                            RawData:name::STRING as Name,
+                            RawData:address::STRING as Address,
+                            RawData:city::STRING as City,
+                            RawData:state::STRING as State,
+                            RawData:zip::STRING as Zip,
+                            RawData:phone::STRING as Phone,
+                            RawData:status::STRING as Status,
+                            RawData:notes::STRING as Notes,
+                            RawData:email::STRING as Email,
+                            RawData:callbacktime::STRING as CallbackTime,
+                            RawData:knockcounter::INTEGER as KnockCounter,
+                            LoadDatetimeUTC,
+                            ROW_NUMBER() OVER (PARTITION BY RawData:doorid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
+                        FROM RAW_DB.FIELDROUTES.DOOR_FACT
+                        WHERE RawData:doorid IS NOT NULL
+                    ) src ON tgt.DoorID = src.DoorID
+                    WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
+                        OfficeID = src.OfficeID,
+                        Latitude = src.Latitude,
+                        Longitude = src.Longitude,
+                        DateCreated = src.DateCreated,
+                        EmployeeID = src.EmployeeID,
+                        Name = src.Name,
+                        Address = src.Address,
+                        City = src.City,
+                        State = src.State,
+                        Zip = src.Zip,
+                        Phone = src.Phone,
+                        Status = src.Status,
+                        Notes = src.Notes,
+                        Email = src.Email,
+                        CallbackTime = src.CallbackTime,
+                        KnockCounter = src.KnockCounter,
+                        LoadDatetimeUTC = src.LoadDatetimeUTC
+                    WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
+                        DoorID, OfficeID, Latitude, Longitude, DateCreated,
+                        EmployeeID, Name, Address, City, State,
+                        Zip, Phone, Status, Notes, Email,
+                        CallbackTime, KnockCounter, LoadDatetimeUTC
+                    ) VALUES (
+                        src.DoorID, src.OfficeID, src.Latitude, src.Longitude, src.DateCreated,
+                        src.EmployeeID, src.Name, src.Address, src.City, src.State,
+                        src.Zip, src.Phone, src.Status, src.Notes, src.Email,
+                        src.CallbackTime, src.KnockCounter, src.LoadDatetimeUTC
+                    )
+                """,
+                
+                "FACT_TICKETITEM": f"""
+                    MERGE INTO STAGING_DB.FIELDROUTES.FACT_TICKETITEM tgt
+                    USING (
+                        SELECT DISTINCT
+                            RawData:ticketid::INTEGER as TicketID,
+                            RawData:customerid::INTEGER as CustomerID,
+                            RawData:billtoaccountid::INTEGER as BillToAccountID,
+                            RawData:officeid::INTEGER as OfficeID,
+                            CASE WHEN RawData:datecreated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:datecreated IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:datecreated::STRING) END as DateCreated,
+                            CASE WHEN RawData:ticketdate::STRING IN ('0000-00-00', '') OR RawData:ticketdate IS NULL 
+                                 THEN NULL ELSE TRY_TO_DATE(RawData:ticketdate::STRING) END as TicketDate,
+                            CASE WHEN RawData:dateupdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateupdated IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateupdated::STRING) END as DateUpdated,
+                            RawData:isactive::BOOLEAN as IsActive,
+                            RawData:subtotal::FLOAT as Subtotal,
+                            RawData:taxamount::FLOAT as TaxAmount,
+                            RawData:total::FLOAT as Total,
+                            RawData:servicecharge::FLOAT as ServiceCharge,
+                            RawData:servicetaxable::INTEGER as ServiceTaxable,
+                            RawData:productionvalue::FLOAT as ProductionValue,
+                            RawData:taxrate::FLOAT as TaxRate,
+                            RawData:appointmentid::INTEGER as AppointmentID,
+                            RawData:remainingbalance::FLOAT as RemainingBalance,
+                            RawData:subscriptionid::INTEGER as SubscriptionID,
+                            RawData:serviceid::INTEGER as ServiceID,
+                            RawData:items as ItemArray,
+                            RawData:glnumber::STRING as GLNumber,
+                            RawData:createdbyemployeeid::INTEGER as CreatedByEmployeeID,
+                            LoadDatetimeUTC,
+                            ROW_NUMBER() OVER (PARTITION BY RawData:ticketid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
+                        FROM RAW_DB.FIELDROUTES.TICKETITEM_FACT
+                        WHERE RawData:ticketid IS NOT NULL
+                    ) src ON tgt.TicketID = src.TicketID
+                    WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
+                        CustomerID = src.CustomerID,
+                        BillToAccountID = src.BillToAccountID,
+                        OfficeID = src.OfficeID,
+                        DateCreated = src.DateCreated,
+                        TicketDate = src.TicketDate,
+                        DateUpdated = src.DateUpdated,
+                        IsActive = src.IsActive,
+                        Subtotal = src.Subtotal,
+                        TaxAmount = src.TaxAmount,
+                        Total = src.Total,
+                        ServiceCharge = src.ServiceCharge,
+                        ServiceTaxable = src.ServiceTaxable,
+                        ProductionValue = src.ProductionValue,
+                        TaxRate = src.TaxRate,
+                        AppointmentID = src.AppointmentID,
+                        RemainingBalance = src.RemainingBalance,
+                        SubscriptionID = src.SubscriptionID,
+                        ServiceID = src.ServiceID,
+                        ItemArray = src.ItemArray,
+                        GLNumber = src.GLNumber,
+                        CreatedByEmployeeID = src.CreatedByEmployeeID,
+                        LoadDatetimeUTC = src.LoadDatetimeUTC
+                    WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
+                        TicketID, CustomerID, BillToAccountID, OfficeID, DateCreated,
+                        TicketDate, DateUpdated, IsActive, Subtotal, TaxAmount,
+                        Total, ServiceCharge, ServiceTaxable, ProductionValue, TaxRate,
+                        AppointmentID, RemainingBalance, SubscriptionID, ServiceID, ItemArray,
+                        GLNumber, CreatedByEmployeeID, LoadDatetimeUTC
+                    ) VALUES (
+                        src.TicketID, src.CustomerID, src.BillToAccountID, src.OfficeID, src.DateCreated,
+                        src.TicketDate, src.DateUpdated, src.IsActive, src.Subtotal, src.TaxAmount,
+                        src.Total, src.ServiceCharge, src.ServiceTaxable, src.ProductionValue, src.TaxRate,
+                        src.AppointmentID, src.RemainingBalance, src.SubscriptionID, src.ServiceID, src.ItemArray,
+                        src.GLNumber, src.CreatedByEmployeeID, src.LoadDatetimeUTC
+                    )
+                """,
+                
+                "FACT_TASK": f"""
+                    MERGE INTO STAGING_DB.FIELDROUTES.FACT_TASK tgt
+                    USING (
+                        SELECT DISTINCT
+                            RawData:taskID::INTEGER as TaskID,
+                            RawData:officeID::INTEGER as OfficeID,
+                            RawData:customerID::INTEGER as CustomerID,
+                            RawData:addedByEmployeeID::INTEGER as AddedByEmployeeID,
+                            RawData:assignedToEmployeeID::INTEGER as AssignedToEmployeeID,
+                            RawData:completedByEmployeeID::INTEGER as CompletedByEmployeeID,
+                            RawData:type::STRING as Type,
+                            CASE WHEN RawData:dueDate::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dueDate IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dueDate::STRING) END as DueDate,
+                            CASE WHEN RawData:dateAdded::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateAdded IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateAdded::STRING) END as DateAdded,
+                            CASE WHEN RawData:dateCompleted::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateCompleted IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateCompleted::STRING) END as DateCompleted,
+                            RawData:categoryID::INTEGER as CategoryID,
+                            RawData:categoryDescription::STRING as CategoryDescription,
+                            RawData:description::STRING as Description,
+                            RawData:completionNotes::STRING as CompletionNotes,
+                            RawData:referenceID::INTEGER as ReferenceID,
+                            RawData:phone::STRING as Phone,
+                            CASE WHEN RawData:dateUpdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateUpdated IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateUpdated::STRING) END as DateUpdated,
+                            RawData:status::STRING as Status,
+                            LoadDatetimeUTC,
+                            ROW_NUMBER() OVER (PARTITION BY RawData:taskID::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
+                        FROM RAW_DB.FIELDROUTES.TASK_FACT
+                        WHERE RawData:taskID IS NOT NULL
+                        {where_clause}
+                    ) src ON tgt.TaskID = src.TaskID
+                    WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
+                        OfficeID = src.OfficeID,
+                        CustomerID = src.CustomerID,
+                        AddedByEmployeeID = src.AddedByEmployeeID,
+                        AssignedToEmployeeID = src.AssignedToEmployeeID,
+                        CompletedByEmployeeID = src.CompletedByEmployeeID,
+                        Type = src.Type,
+                        DueDate = src.DueDate,
+                        DateAdded = src.DateAdded,
+                        DateCompleted = src.DateCompleted,
+                        CategoryID = src.CategoryID,
+                        CategoryDescription = src.CategoryDescription,
+                        Description = src.Description,
+                        CompletionNotes = src.CompletionNotes,
+                        ReferenceID = src.ReferenceID,
+                        Phone = src.Phone,
+                        DateUpdated = src.DateUpdated,
+                        Status = src.Status,
+                        LoadDatetimeUTC = src.LoadDatetimeUTC
+                    WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
+                        TaskID, OfficeID, CustomerID, AddedByEmployeeID, AssignedToEmployeeID,
+                        CompletedByEmployeeID, Type, DueDate, DateAdded, DateCompleted,
+                        CategoryID, CategoryDescription, Description, CompletionNotes, ReferenceID,
+                        Phone, DateUpdated, Status, LoadDatetimeUTC
+                    ) VALUES (
+                        src.TaskID, src.OfficeID, src.CustomerID, src.AddedByEmployeeID, src.AssignedToEmployeeID,
+                        src.CompletedByEmployeeID, src.Type, src.DueDate, src.DateAdded, src.DateCompleted,
+                        src.CategoryID, src.CategoryDescription, src.Description, src.CompletionNotes, src.ReferenceID,
+                        src.Phone, src.DateUpdated, src.Status, src.LoadDatetimeUTC
+                    )
+                """
+            }
+            
+            # Execute the missing table transformations
+            for table_name, merge_sql in missing_table_transformations.items():
                 logger.info(f"Transforming {table_name}")
                 cursor.execute(merge_sql)
                 logger.info(f"Completed {table_name} transformation")

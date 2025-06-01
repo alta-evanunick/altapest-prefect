@@ -1,98 +1,205 @@
 -- ========================================================================
 -- Production Reporting Views for Power BI
 -- These views live in PRODUCTION_DB.FIELDROUTES and reference STAGING_DB
+-- Updated to match latest table structures and naming conventions
 -- ========================================================================
 
 USE DATABASE PRODUCTION_DB;
+CREATE SCHEMA IF NOT EXISTS FIELDROUTES;
 USE SCHEMA FIELDROUTES;
 
 -- ===== CORE ENTITY VIEWS =====
 
--- Customer View with exact field mappings from FR_SF_Lookup.csv
+-- Customer View with exact field mappings from table structure
 CREATE OR REPLACE VIEW VW_CUSTOMER AS
 SELECT 
     CustomerID,
+    BillToAccountID,
     OfficeID,
-    FirstName,
-    LastName,
+    FName as FirstName,
+    LName as LastName,
     CompanyName,
+    Spouse,
+    IsCommercial,
+    Status,
+    StatusText,
     Email,
     Phone1,
+    Phone1_Ext,
     Phone2,
+    Phone2_Ext,
     Address,
     City,
     State,
-    ZipCode,
+    Zip as ZipCode,
     BillingCompanyName,
-    BillingFirstName,
-    BillingLastName,
+    BillingFName as BillingFirstName,
+    BillingLName as BillingLastName,
     BillingAddress,
     BillingCity,
     BillingState,
     BillingZip,
+    BillingPhone,
+    BillingEmail,
+    Latitude,
+    Longitude,
+    SqFeet,
+    AddedByEmployeeID,
+    DateAdded,
+    DateCancelled,
+    DateUpdated,
+    SourceID,
+    Source,
+    APay,
+    PreferredTechID,
+    PaidInFull,
+    SubscriptionIDs,
     Balance,
     BalanceAge,
-    SourceID,
-    Status,
-    DateAdded,
-    DateUpdated,
-    DateCancelled,
+    ResponsibleBalance,
+    ResponsibleBalanceAge,
+    MasterAccount,
+    PreferredBillingDate,
+    PaymentHoldDate,
+    LatestCCLastFour,
+    LatestCCExpDate,
+    AppointmentIDs,
+    TicketIDs,
+    PaymentIDs,
+    RegionID,
+    SpecialScheduling,
+    TaxRate,
+    StateTax,
+    CityTax,
+    CountyTax,
+    DistrictTax,
+    CustomTax,
+    ZipTaxID,
+    SMSReminders,
+    PhoneReminders,
+    EmailReminders,
+    CustomerSource,
+    CustomerSourceID,
+    MaxMonthlyCharge,
+    County,
+    AutopayPaymentProfileID,
+    DivisionID,
+    AgingDate,
+    ResponsibleAgingDate,
+    SalesmanAPay,
+    TermiteMonitoring,
+    PendingCancel,
     LoadDatetimeUTC
 FROM STAGING_DB.FIELDROUTES.FACT_CUSTOMER;
 
 -- Employee View
 CREATE OR REPLACE VIEW VW_EMPLOYEE AS
 SELECT 
-    e.EmployeeID,
-    e.OfficeID,
-    e.FirstName,
-    e.LastName,
-    e.Email,
-    e.Phone,
-    e.IsActive,
-    e.IsServicePro,
-    e.DateHired,
-    e.DateTerminated,
-    e.LoadDatetimeUTC
-FROM STAGING_DB.FIELDROUTES.FACT_EMPLOYEE e;
+    EmployeeID,
+    OfficeID,
+    IsActive,
+    FName as FirstName,
+    LName as LastName,
+    EmployeeTypeText,
+    Address,
+    City,
+    State,
+    Zip,
+    Phone,
+    Email,
+    Experience,
+    SkillIDs,
+    SkillDescriptions,
+    LinkedEmployeeIDs,
+    EmployeeLink,
+    LicenseNumber,
+    SupervisorID,
+    RoamingRep,
+    RegionalManagerOfficeIDs,
+    LastLogin,
+    TeamIDs,
+    PrimaryTeam,
+    AccessControlProfileID,
+    StartAddress,
+    StartCity,
+    StartState,
+    StartZip,
+    StartLatitude,
+    StartLongitude,
+    DateHired,
+    DateUpdated,
+    LoadDatetimeUTC
+FROM STAGING_DB.FIELDROUTES.FACT_EMPLOYEE;
 
 -- Appointment View  
 CREATE OR REPLACE VIEW VW_APPOINTMENT AS
 SELECT 
-    a.AppointmentID,
-    a.OfficeID,
-    a.CustomerID,
-    a.EmployeeID,
-    a.RouteID,
-    a.ServiceTypeID,
-    a.ScheduledStart,
-    a.ScheduledEnd,
-    a.Duration,
-    a.Status,
-    a.DateAdded,
-    a.DateUpdated,
-    a.LoadDatetimeUTC
-FROM STAGING_DB.FIELDROUTES.FACT_APPOINTMENT a;
+    AppointmentID,
+    OfficeID,
+    CustomerID,
+    SubscriptionID,
+    SubscriptionRegionID,
+    RouteID,
+    SpotID,
+    AppointmentDate,
+    StartTime,
+    EndTime,
+    TimeWindow,
+    Duration,
+    AppointmentType,
+    DateAdded,
+    EmployeeID,
+    Status,
+    StatusText,
+    CallAhead,
+    IsInitial,
+    SubscriptionPreferredTech,
+    CompletedBy,
+    ServicedBy,
+    DateCompleted,
+    AppointmentNotes,
+    OfficeNotes,
+    TimeIn,
+    TimeOut,
+    CheckIn,
+    CheckOut,
+    WindSpeed,
+    WindDirection,
+    Temperature,
+    IsInterior,
+    TicketID,
+    DateCancelled,
+    AdditionalTechs,
+    NotificationPreference,
+    LoadDatetimeUTC
+FROM STAGING_DB.FIELDROUTES.FACT_APPOINTMENT;
 
 -- Ticket (Invoice) View
 CREATE OR REPLACE VIEW VW_TICKET AS
 SELECT 
     TicketID,
-    OfficeID,
-    CustomerID,
-    SubscriptionID,
     AppointmentID,
-    ServiceTypeID,
-    InvoiceNumber,
-    TotalAmount,
-    SubtotalAmount,
-    TaxAmount,
-    Balance,
-    ServiceCharge,
-    ServiceDate,
+    CustomerID,
+    BillToAccountID,
+    OfficeID,
     DateCreated,
+    InvoiceDate,
     DateUpdated,
+    IsActive,
+    Subtotal,
+    TaxAmount,
+    Total as TotalAmount,
+    ServiceCharge,
+    ServiceTaxable,
+    ProductionValue,
+    TaxRate,
+    Balance,
+    SubscriptionID,
+    ServiceID,
+    Items,
+    CreatedByEmployeeID,
     CompletedOn,
+    ServiceTypeID,
     Status,
     LoadDatetimeUTC
 FROM STAGING_DB.FIELDROUTES.FACT_TICKET;
@@ -103,13 +210,26 @@ SELECT
     PaymentID,
     OfficeID,
     CustomerID,
+    PaymentDate,
+    PaymentMethod,
     Amount,
     AppliedAmount,
-    PaymentMethod,
-    CheckNumber,
-    PaymentDate,
-    AppliedOn,
-    DateCreated,
+    UnassignedAmount,
+    Status,
+    InvoiceIDs,
+    PaymentApplications,
+    EmployeeIDs,
+    IsOfficePayment,
+    IsCollectionPayment,
+    Writeoff,
+    CreditMemo,
+    PaymentOrigin,
+    OriginalPaymentID,
+    LastFour,
+    PaymentNotes,
+    BatchOpened,
+    BatchClosed,
+    PaymentSource,
     DateUpdated,
     LoadDatetimeUTC
 FROM STAGING_DB.FIELDROUTES.FACT_PAYMENT;
@@ -118,11 +238,12 @@ FROM STAGING_DB.FIELDROUTES.FACT_PAYMENT;
 CREATE OR REPLACE VIEW VW_APPLIED_PAYMENT AS
 SELECT 
     AppliedPaymentID,
+    OfficeID,
     PaymentID,
     TicketID,
-    OfficeID,
+    CustomerID,
+    DateApplied,
     AppliedAmount,
-    AppliedDate,
     DateUpdated,
     LoadDatetimeUTC,
     TRUE as IsCurrent -- For compatibility with DAX measures
@@ -131,44 +252,63 @@ FROM STAGING_DB.FIELDROUTES.FACT_APPLIED_PAYMENT;
 -- Route View
 CREATE OR REPLACE VIEW VW_ROUTE AS
 SELECT 
-    r.RouteID,
-    r.OfficeID,
-    r.RouteName,
-    r.RouteDate,
-    r.EmployeeID,
-    r.Status,
-    r.TotalStops,
-    r.CompletedStops,
-    r.LoadDatetimeUTC
-FROM STAGING_DB.FIELDROUTES.FACT_ROUTE r;
+    RouteID,
+    OfficeID,
+    DateCreated,
+    DateUpdated,
+    RouteDate,
+    RouteEmployeeID,
+    SpotsSold,
+    SpotsOpen,
+    Status,
+    DateCompleted,
+    DateCancelled,
+    StartTime,
+    EndTime,
+    LoadDatetimeUTC
+FROM STAGING_DB.FIELDROUTES.FACT_ROUTE;
 
 -- Task View
 CREATE OR REPLACE VIEW VW_TASK AS
 SELECT 
-    t.TaskID,
-    t.OfficeID,
-    t.CustomerID,
-    t.EmployeeID,
-    t.Description,
-    t.DueDate,
-    t.CompletedDate,
-    t.Status,
-    t.Priority,
-    t.LoadDatetimeUTC
-FROM STAGING_DB.FIELDROUTES.FACT_TASK t;
+    TaskID,
+    OfficeID,
+    CustomerID,
+    SubscriptionID,
+    TicketID,
+    AppointmentID,
+    TaskType,
+    TaskDescription,
+    Status,
+    NeedsApproval,
+    ApprovalStatus,
+    AssignedTo,
+    CreatedBy,
+    DateCreated,
+    DueDate,
+    DateCompleted,
+    DateUpdated,
+    LoadDatetimeUTC
+FROM STAGING_DB.FIELDROUTES.FACT_TASK;
 
 -- Note View
 CREATE OR REPLACE VIEW VW_NOTE AS
 SELECT 
-    n.NoteID,
-    n.OfficeID,
-    n.CustomerID,
-    n.EmployeeID,
-    n.NoteText,
-    n.NoteType,
-    n.DateAdded,
-    n.LoadDatetimeUTC
-FROM STAGING_DB.FIELDROUTES.FACT_NOTE n;
+    NoteID,
+    OfficeID,
+    CustomerID,
+    EmployeeID,
+    EmployeeName,
+    DateCreated,
+    IsVisibleCustomer,
+    IsVisibleTechnician,
+    CancellationReasonID,
+    CancellationReason,
+    TypeID,
+    TypeDescription,
+    NoteContent,
+    LoadDatetimeUTC
+FROM STAGING_DB.FIELDROUTES.FACT_NOTE;
 
 -- ===== DIMENSION VIEWS =====
 
@@ -177,29 +317,30 @@ CREATE OR REPLACE VIEW VW_OFFICE AS
 SELECT 
     OfficeID,
     OfficeName,
-    RegionID,
+    CompanyID,
+    LicenseNumber,
+    ContactNumber,
+    ContactEmail,
+    Timezone,
     Address,
     City,
     State,
     ZipCode,
-    Phone,
-    IsActive,
-    LoadDatetimeUTC,
-    -- Add derived fields
-    CASE 
-        WHEN RegionID = 1 THEN 'West'
-        WHEN RegionID = 2 THEN 'East'
-        WHEN RegionID = 3 THEN 'Central'
-        ELSE 'Unknown'
-    END as RegionName,
-    State as Market
+    CautionStatements,
+    OfficeLatitude,
+    OfficeLongitude,
+    LoadDatetimeUTC
 FROM STAGING_DB.FIELDROUTES.DIM_OFFICE;
 
 -- Region Dimension
 CREATE OR REPLACE VIEW VW_REGION AS
 SELECT 
     RegionID,
-    RegionName,
+    OfficeID,
+    DateCreated,
+    DateDeleted,
+    LatAndLong,
+    RegionType,
     IsActive,
     LoadDatetimeUTC
 FROM STAGING_DB.FIELDROUTES.DIM_REGION;
@@ -208,43 +349,91 @@ FROM STAGING_DB.FIELDROUTES.DIM_REGION;
 CREATE OR REPLACE VIEW VW_SERVICE_TYPE AS
 SELECT 
     ServiceTypeID,
-    ServiceTypeName,
-    Category,
-    IsRecurring,
+    OfficeID,
+    ServiceName,
+    Description,
+    Frequency,
     DefaultCharge,
-    IsActive,
+    Category,
+    IsReserviceType,
+    DefaultAppointmentLength,
+    DefaultInitialCharge,
+    InitialID,
+    MinRecurringCharge,
+    MinInitialCharge,
+    IsRegularService,
+    IsInitialService,
+    SeasonStart,
+    SeasonEnd,
+    SentriconServiceType,
+    IsVisible,
+    DefaultFollowupDelay,
+    SalesVisible,
     LoadDatetimeUTC
-FROM STAGING_DB.FIELDROUTES.DIM_SERVICE_TYPE;
+FROM STAGING_DB.FIELDROUTES.DIM_SERVICETYPE;
 
 -- Customer Source Dimension
 CREATE OR REPLACE VIEW VW_CUSTOMER_SOURCE AS
 SELECT 
     SourceID,
+    OfficeID,
     SourceName,
-    IsActive,
+    IsSalesroutesDefault,
+    IsVisible,
+    IsDealsSource,
     LoadDatetimeUTC
-FROM STAGING_DB.FIELDROUTES.DIM_CUSTOMER_SOURCE;
+FROM STAGING_DB.FIELDROUTES.DIM_CUSTOMERSOURCE;
 
 -- Product Dimension
 CREATE OR REPLACE VIEW VW_PRODUCT AS
 SELECT 
     ProductID,
-    ProductName,
-    Category,
-    UnitCost,
-    IsActive,
+    OfficeID,
+    Description,
+    GLAccountID,
+    Amount,
+    Taxable,
+    ProductCode,
+    ProductCategory,
+    IsVisible,
+    IsSalesVisible,
+    IsRecurring,
     LoadDatetimeUTC
 FROM STAGING_DB.FIELDROUTES.DIM_PRODUCT;
 
 -- Generic Flag Dimension
 CREATE OR REPLACE VIEW VW_GENERIC_FLAG AS
 SELECT 
-    gf.GenericFlagID,
-    gf.FlagName,
-    gf.FlagType,
-    gf.IsActive,
-    gf.LoadDatetimeUTC
-FROM STAGING_DB.FIELDROUTES.DIM_GENERIC_FLAG gf;
+    GenericFlagID,
+    OfficeID,
+    FlagCode,
+    FlagDescription,
+    FlagStatus,
+    FlagType,
+    DateCreated,
+    DateUpdated,
+    LoadDatetimeUTC
+FROM STAGING_DB.FIELDROUTES.DIM_GENERICFLAG;
+
+-- Cancellation Reason Dimension
+CREATE OR REPLACE VIEW VW_CANCELLATION_REASON AS
+SELECT 
+    CancellationReasonID,
+    OfficeID,
+    ReasonName,
+    IsActive,
+    LoadDatetimeUTC
+FROM STAGING_DB.FIELDROUTES.DIM_CANCELLATIONREASON;
+
+-- Re-Service Reason Dimension
+CREATE OR REPLACE VIEW VW_RESERVICEREASON AS
+SELECT 
+    ReserviceReasonID,
+    OfficeID,
+    IsVisible,
+    Description,
+    LoadDatetimeUTC
+FROM STAGING_DB.FIELDROUTES.DIM_RESERVICEREASON;
 
 -- ===== AR DASHBOARD VIEWS =====
 
@@ -255,9 +444,8 @@ WITH TicketAging AS (
         t.CustomerID,
         t.OfficeID,
         t.TicketID,
-        t.InvoiceNumber,
         t.CompletedOn,
-        t.TotalAmount,
+        t.Total as TotalAmount,
         t.Balance as BalanceAmount,
         DATEDIFF(day, t.CompletedOn, CURRENT_DATE()) as DaysOutstanding,
         CASE 
@@ -274,10 +462,10 @@ WITH TicketAging AS (
 )
 SELECT 
     ta.*,
-    c.FirstName || ' ' || c.LastName as CustomerName,
+    c.FName || ' ' || c.LName as CustomerName,
+    c.CompanyName,
     c.Status as CustomerStatus,
-    o.OfficeName,
-    o.RegionName
+    o.OfficeName
 FROM TicketAging ta
 JOIN STAGING_DB.FIELDROUTES.FACT_CUSTOMER c ON ta.CustomerID = c.CustomerID
 JOIN VW_OFFICE o ON ta.OfficeID = o.OfficeID;
@@ -288,7 +476,7 @@ WITH DailyMetrics AS (
     SELECT 
         DATE_TRUNC('day', CompletedOn) as CalculationDate,
         OfficeID,
-        SUM(TotalAmount) as DailyRevenue,
+        SUM(Total) as DailyRevenue,
         SUM(Balance) as DailyARBalance
     FROM STAGING_DB.FIELDROUTES.FACT_TICKET
     WHERE Status = 'Completed'
@@ -308,7 +496,25 @@ SELECT
         PARTITION BY OfficeID 
         ORDER BY CalculationDate 
         ROWS BETWEEN 29 PRECEDING AND CURRENT ROW
-    ) as TotalRevenue30Days
+    ) as TotalRevenue30Days,
+    -- Calculate DSO
+    CASE 
+        WHEN SUM(DailyRevenue) OVER (
+            PARTITION BY OfficeID 
+            ORDER BY CalculationDate 
+            ROWS BETWEEN 29 PRECEDING AND CURRENT ROW
+        ) > 0 
+        THEN (AVG(DailyARBalance) OVER (
+            PARTITION BY OfficeID 
+            ORDER BY CalculationDate 
+            ROWS BETWEEN 29 PRECEDING AND CURRENT ROW
+        ) / SUM(DailyRevenue) OVER (
+            PARTITION BY OfficeID 
+            ORDER BY CalculationDate 
+            ROWS BETWEEN 29 PRECEDING AND CURRENT ROW
+        )) * 30
+        ELSE 0
+    END as DSO
 FROM DailyMetrics;
 
 -- CEI Metrics View
@@ -318,8 +524,8 @@ WITH MonthlyMetrics AS (
         DATE_TRUNC('month', CURRENT_DATE()) as CalculationDate,
         t.OfficeID,
         SUM(CASE WHEN t.CompletedOn >= DATE_TRUNC('month', CURRENT_DATE()) 
-                 THEN t.TotalAmount ELSE 0 END) as MonthlyInvoiced,
-        SUM(CASE WHEN p.AppliedOn >= DATE_TRUNC('month', CURRENT_DATE())
+                 THEN t.Total ELSE 0 END) as MonthlyInvoiced,
+        SUM(CASE WHEN p.PaymentDate >= DATE_TRUNC('month', CURRENT_DATE())
                  THEN ap.AppliedAmount ELSE 0 END) as MonthlyCollected
     FROM STAGING_DB.FIELDROUTES.FACT_TICKET t
     LEFT JOIN STAGING_DB.FIELDROUTES.FACT_APPLIED_PAYMENT ap ON t.TicketID = ap.TicketID
@@ -355,7 +561,7 @@ SELECT
     'New Invoices' as Category,
     2 as SortOrder,
     SUM(CASE WHEN CompletedOn >= DATE_TRUNC('month', CURRENT_DATE())
-             THEN TotalAmount ELSE 0 END) as Amount
+             THEN Total ELSE 0 END) as Amount
 FROM STAGING_DB.FIELDROUTES.FACT_TICKET
 WHERE Status = 'Completed'
 
@@ -367,17 +573,16 @@ SELECT
     -1 * SUM(ap.AppliedAmount) as Amount
 FROM STAGING_DB.FIELDROUTES.FACT_APPLIED_PAYMENT ap
 JOIN STAGING_DB.FIELDROUTES.FACT_PAYMENT p ON ap.PaymentID = p.PaymentID
-WHERE p.AppliedOn >= DATE_TRUNC('month', CURRENT_DATE())
+WHERE p.PaymentDate >= DATE_TRUNC('month', CURRENT_DATE())
 
 UNION ALL
 
 SELECT 
     'Write-offs' as Category,
     4 as SortOrder,
-    -1 * SUM(Amount) as Amount
-FROM STAGING_DB.FIELDROUTES.FACT_CREDIT_MEMO
-WHERE Type = 'Write-off'
-AND CreatedDate >= DATE_TRUNC('month', CURRENT_DATE())
+    -1 * SUM(CASE WHEN Writeoff = 1 THEN Amount ELSE 0 END) as Amount
+FROM STAGING_DB.FIELDROUTES.FACT_PAYMENT
+WHERE PaymentDate >= DATE_TRUNC('month', CURRENT_DATE())
 
 UNION ALL
 
@@ -397,26 +602,15 @@ SELECT
     ap.OfficeID,
     t.CustomerID,
     t.CompletedOn as InvoiceDate,
-    p.AppliedOn as PaymentDate,
-    DATEDIFF(day, t.CompletedOn, p.AppliedOn) as DaysToPay,
+    p.PaymentDate,
+    DATEDIFF(day, t.CompletedOn, p.PaymentDate) as DaysToPay,
     ap.AppliedAmount,
-    t.TotalAmount as InvoiceAmount
+    t.Total as InvoiceAmount
 FROM STAGING_DB.FIELDROUTES.FACT_APPLIED_PAYMENT ap
 JOIN STAGING_DB.FIELDROUTES.FACT_TICKET t ON ap.TicketID = t.TicketID
 JOIN STAGING_DB.FIELDROUTES.FACT_PAYMENT p ON ap.PaymentID = p.PaymentID
 WHERE t.Status = 'Completed'
-AND p.AppliedOn IS NOT NULL;
-
--- Credit Memo View (placeholder - create table if doesn't exist)
-CREATE OR REPLACE VIEW VW_CREDIT_MEMO AS
-SELECT 
-    NULL::INTEGER as CreditMemoID,
-    NULL::INTEGER as TicketID,
-    NULL::INTEGER as CustomerID,
-    NULL::FLOAT as Amount,
-    NULL::VARCHAR as Type,
-    NULL::TIMESTAMP_NTZ as CreatedDate
-WHERE 1=0;  -- Empty view until table is created
+AND p.PaymentDate IS NOT NULL;
 
 -- ===== PERFORMANCE DASHBOARD VIEWS =====
 
@@ -424,15 +618,15 @@ WHERE 1=0;  -- Empty view until table is created
 CREATE OR REPLACE VIEW VW_REVENUE_LEAKAGE AS
 WITH ServiceMetrics AS (
     SELECT 
-        DATE_TRUNC('month', ServiceDate) as ServiceMonth,
+        DATE_TRUNC('month', CompletedOn) as ServiceMonth,
         OfficeID,
         COUNT(DISTINCT TicketID) as TotalServices,
         COUNT(DISTINCT CASE WHEN Status = 'Completed' THEN TicketID END) as CompletedServices,
         COUNT(DISTINCT CASE WHEN Status = 'Cancelled' THEN TicketID END) as CancelledServices,
-        SUM(CASE WHEN Status = 'Completed' THEN TotalAmount ELSE 0 END) as CompletedRevenue,
-        SUM(CASE WHEN Status = 'Cancelled' THEN TotalAmount ELSE 0 END) as LostRevenue
+        SUM(CASE WHEN Status = 'Completed' THEN Total ELSE 0 END) as CompletedRevenue,
+        SUM(CASE WHEN Status = 'Cancelled' THEN Total ELSE 0 END) as LostRevenue
     FROM STAGING_DB.FIELDROUTES.FACT_TICKET
-    GROUP BY DATE_TRUNC('month', ServiceDate), OfficeID
+    GROUP BY DATE_TRUNC('month', CompletedOn), OfficeID
 )
 SELECT 
     ServiceMonth,
@@ -452,7 +646,7 @@ FROM ServiceMetrics;
 -- Collection Performance View
 CREATE OR REPLACE VIEW VW_COLLECTION_PERFORMANCE AS
 SELECT 
-    DATE_TRUNC('month', p.AppliedOn) as CollectionMonth,
+    DATE_TRUNC('month', p.PaymentDate) as CollectionMonth,
     p.OfficeID,
     COUNT(DISTINCT p.CustomerID) as PayingCustomers,
     COUNT(DISTINCT p.PaymentID) as TotalPayments,
@@ -463,8 +657,56 @@ SELECT
     COUNT(DISTINCT CASE WHEN p.PaymentMethod = 'Cash' THEN p.PaymentID END) as CashPayments,
     COUNT(DISTINCT CASE WHEN p.PaymentMethod = 'ACH' THEN p.PaymentID END) as ACHPayments
 FROM STAGING_DB.FIELDROUTES.FACT_PAYMENT p
-WHERE p.AppliedOn IS NOT NULL
-GROUP BY DATE_TRUNC('month', p.AppliedOn), p.OfficeID;
+WHERE p.PaymentDate IS NOT NULL
+GROUP BY DATE_TRUNC('month', p.PaymentDate), p.OfficeID;
+
+-- Customer Lifetime Value View
+CREATE OR REPLACE VIEW VW_CUSTOMER_LIFETIME_VALUE AS
+SELECT 
+    c.CustomerID,
+    c.OfficeID,
+    c.FName || ' ' || c.LName as CustomerName,
+    c.CompanyName,
+    c.DateAdded,
+    c.DateCancelled,
+    c.Status,
+    COUNT(DISTINCT t.TicketID) as TotalTickets,
+    SUM(t.Total) as LifetimeRevenue,
+    SUM(t.Balance) as OutstandingBalance,
+    AVG(t.Total) as AvgTicketValue,
+    DATEDIFF(month, c.DateAdded, COALESCE(c.DateCancelled, CURRENT_DATE())) as TenureMonths
+FROM STAGING_DB.FIELDROUTES.FACT_CUSTOMER c
+LEFT JOIN STAGING_DB.FIELDROUTES.FACT_TICKET t ON c.CustomerID = t.CustomerID
+GROUP BY 
+    c.CustomerID,
+    c.OfficeID,
+    c.FName,
+    c.LName,
+    c.CompanyName,
+    c.DateAdded,
+    c.DateCancelled,
+    c.Status;
+
+-- Subscription Performance View
+CREATE OR REPLACE VIEW VW_SUBSCRIPTION_PERFORMANCE AS
+SELECT 
+    s.SubscriptionID,
+    s.OfficeID,
+    s.CustomerID,
+    s.ServiceID,
+    s.Frequency,
+    s.DateAdded,
+    s.NextServiceDate,
+    s.SubscriptionStatus,
+    s.AgreementLength,
+    s.PreferredDays,
+    s.PreferredEmployee,
+    s.Price,
+    s.RegionID,
+    st.ServiceName,
+    st.Category as ServiceCategory
+FROM STAGING_DB.FIELDROUTES.FACT_SUBSCRIPTION s
+LEFT JOIN STAGING_DB.FIELDROUTES.DIM_SERVICETYPE st ON s.ServiceID = st.ServiceTypeID AND s.OfficeID = st.OfficeID;
 
 -- ===== GRANT PERMISSIONS =====
 -- Grant SELECT on all views to appropriate roles
@@ -475,3 +717,6 @@ CREATE ROLE IF NOT EXISTS POWERBI_READER;
 GRANT USAGE ON DATABASE PRODUCTION_DB TO ROLE POWERBI_READER;
 GRANT USAGE ON SCHEMA PRODUCTION_DB.FIELDROUTES TO ROLE POWERBI_READER;
 GRANT SELECT ON ALL VIEWS IN SCHEMA PRODUCTION_DB.FIELDROUTES TO ROLE POWERBI_READER;
+
+-- Grant the role to specific users
+-- GRANT ROLE POWERBI_READER TO USER 'powerbi_service_account';
