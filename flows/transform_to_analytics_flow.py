@@ -1305,7 +1305,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 DoorID INTEGER,
                 DateAdded TIMESTAMP_NTZ,
                 DateUpdated TIMESTAMP_NTZ,
-                LoadDatetimeUTC TIMESTAMP_NTZ,
+                LoadDatetimeUTC TIMESTAMP_NTZ
             )
         """,
         
@@ -1599,7 +1599,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                         DoorID INTEGER,
                         DateAdded TIMESTAMP_NTZ,
                         DateUpdated TIMESTAMP_NTZ,
-                        LoadDatetimeUTC TIMESTAMP_NTZ,
+                        LoadDatetimeUTC TIMESTAMP_NTZ
                     )
                 """,
                 
