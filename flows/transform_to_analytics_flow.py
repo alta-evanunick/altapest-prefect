@@ -1521,7 +1521,8 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                             LoadDatetimeUTC,
                             ROW_NUMBER() OVER (PARTITION BY RawData:reminderid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                         FROM RAW_DB.FIELDROUTES.APPOINTMENTREMINDER_FACT
-                        {where_clause}
+                        WHERE RawData:reminderid IS NOT NULL
+                        {f"AND LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())" if incremental else ""}
                     ) src
                     ON tgt.ReminderID = src.ReminderID
                     WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
@@ -1598,7 +1599,8 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                             LoadDatetimeUTC,
                             ROW_NUMBER() OVER (PARTITION BY RawData:paymentprofileid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                         FROM RAW_DB.FIELDROUTES.PAYMENTPROFILE_FACT
-                        {where_clause}
+                        WHERE RawData:paymentprofileid IS NOT NULL
+                        {f"AND LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())" if incremental else ""}
                     ) src
                     ON tgt.PaymentProfileID = src.PaymentProfileID
                     WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
@@ -1696,7 +1698,8 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                             LoadDatetimeUTC,
                             ROW_NUMBER() OVER (PARTITION BY RawData:routeid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                         FROM RAW_DB.FIELDROUTES.ROUTE_FACT
-                        {where_clause}
+                        WHERE RawData:routeid IS NOT NULL
+                        {f"AND LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())" if incremental else ""}
                     ) src
                     ON tgt.RouteID = src.RouteID
                     WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
@@ -1766,6 +1769,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                             ROW_NUMBER() OVER (PARTITION BY RawData:knockid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                         FROM RAW_DB.FIELDROUTES.KNOCK_FACT
                         WHERE RawData:knockid IS NOT NULL
+                        {f"AND LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())" if incremental else ""}
                     ) src ON tgt.KnockID = src.KnockID
                     WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
                         DoorID = src.DoorID,
@@ -1808,6 +1812,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                             ROW_NUMBER() OVER (PARTITION BY RawData:genericflagassignmentid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                         FROM RAW_DB.FIELDROUTES.GENERICFLAGASSIGNMENT_FACT
                         WHERE RawData:genericflagassignmentid IS NOT NULL
+                        {f"AND LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())" if incremental else ""}
                     ) src ON tgt.GenericFlagAssignmentID = src.GenericFlagAssignmentID
                     WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
                         OfficeID = src.OfficeID,
@@ -1838,6 +1843,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                             ROW_NUMBER() OVER (PARTITION BY RawData:disbursementitemid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                         FROM RAW_DB.FIELDROUTES.DISBURSEMENTITEM_FACT
                         WHERE RawData:disbursementitemid IS NOT NULL
+                        {f"AND LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())" if incremental else ""}
                     ) src ON tgt.DisbursementItemID = src.DisbursementItemID
                     WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
                         DisbursementID = src.DisbursementID,
@@ -1865,6 +1871,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                             ROW_NUMBER() OVER (PARTITION BY RawData:additionalcontactid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                         FROM RAW_DB.FIELDROUTES.ADDITIONALCONTACTS_FACT
                         WHERE RawData:additionalcontactid IS NOT NULL
+                        {f"AND LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())" if incremental else ""}
                     ) src ON tgt.AdditionalContactID = src.AdditionalContactID
                     WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
                         CustomerID = src.CustomerID,
@@ -1902,6 +1909,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                             ROW_NUMBER() OVER (PARTITION BY RawData:chargebackid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                         FROM RAW_DB.FIELDROUTES.CHARGEBACK_FACT
                         WHERE RawData:chargebackid IS NOT NULL
+                        {f"AND LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())" if incremental else ""}
                     ) src ON tgt.ChargebackID = src.ChargebackID
                     WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
                         TransactionID = src.TransactionID,
@@ -1952,6 +1960,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                             ROW_NUMBER() OVER (PARTITION BY RawData:disbursementid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                         FROM RAW_DB.FIELDROUTES.DISBURSEMENT_FACT
                         WHERE RawData:disbursementid IS NOT NULL
+                        {f"AND LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())" if incremental else ""}
                     ) src ON tgt.DisbursementID = src.DisbursementID
                     WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
                         EmployeeID = src.EmployeeID,
@@ -2009,6 +2018,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                             ROW_NUMBER() OVER (PARTITION BY RawData:doorid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                         FROM RAW_DB.FIELDROUTES.DOOR_FACT
                         WHERE RawData:doorid IS NOT NULL
+                        {f"AND LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())" if incremental else ""}
                     ) src ON tgt.DoorID = src.DoorID
                     WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
                         OfficeID = src.OfficeID,
@@ -2074,6 +2084,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                             ROW_NUMBER() OVER (PARTITION BY RawData:ticketid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                         FROM RAW_DB.FIELDROUTES.TICKETITEM_FACT
                         WHERE RawData:ticketid IS NOT NULL
+                        {f"AND LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())" if incremental else ""}
                     ) src ON tgt.TicketID = src.TicketID
                     WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
                         CustomerID = src.CustomerID,
@@ -2143,7 +2154,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                             ROW_NUMBER() OVER (PARTITION BY RawData:taskID::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                         FROM RAW_DB.FIELDROUTES.TASK_FACT
                         WHERE RawData:taskID IS NOT NULL
-                        {where_clause}
+                        {f"AND LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())" if incremental else ""}
                     ) src ON tgt.TaskID = src.TaskID
                     WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
                         OfficeID = src.OfficeID,
