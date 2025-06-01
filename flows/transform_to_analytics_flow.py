@@ -1283,8 +1283,8 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 BankName STRING,
                 BankAccountNumber STRING,
                 BankRoutingNumber STRING,
+                CheckType STRING,
                 BankAccountType STRING,
-                BankType STRING,
                 FailedAttempts INTEGER,
                 SentFailureDate TIMESTAMP_NTZ,
                 LastAttemptDate TIMESTAMP_NTZ,
@@ -1545,7 +1545,9 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                         BankName STRING,
                         BankAccountNumber STRING,
                         BankRoutingNumber STRING,
+                        CheckType STRING,
                         BankAccountType STRING,
+                        FailedAttempts INTEGER,
                         LoadDatetimeUTC TIMESTAMP_NTZ
                     )
                 """,
@@ -1827,8 +1829,8 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                             RawData:bankname::STRING as BankName,
                             RawData:accountnumber::STRING as BankAccountNumber,
                             RawData:routingnumber::STRING as BankRoutingNumber,
-                            RawData:checktype::STRING as BankAccountType,
-                            RawData:accounttype::STRING as BankType,
+                            RawData:checktype::STRING as CheckType,
+                            RawData:accounttype::STRING as BankAccountType,
                             RawData:failedattempts::INTEGER as FailedAttempts,
                             CASE WHEN RawData:sentfailuredate::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:sentfailuredate IS NULL 
                                  THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:sentfailuredate::STRING) END as SentFailureDate,
@@ -1873,8 +1875,8 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                         BankName = src.BankName,
                         BankAccountNumber = src.BankAccountNumber,
                         BankRoutingNumber = src.BankRoutingNumber,
+                        CheckType = src.CheckType,
                         BankAccountType = src.BankAccountType,
-                        BankType = src.BankType,
                         FailedAttempts = src.FailedAttempts,
                         SentFailureDate = src.SentFailureDate,
                         LastAttemptDate = src.LastAttemptDate,
@@ -1889,7 +1891,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                         BillingAddress, BillingCity, BillingState, BillingZip, BillingPhone,
                         BillingEmail, PaymentMethod, GatewayName, MerchantID, MerchantToken,
                         LastFour, ExpMonth, ExpYear, CardType, BankName,
-                        BankAccountNumber, BankRoutingNumber, BankAccountType, BankType, FailedAttempts,
+                        BankAccountNumber, BankRoutingNumber, CheckType, BankAccountType, FailedAttempts,
                         SentFailureDate, LastAttemptDate, PaymentHoldDate, RetryPoints, InitialTransactionID,
                         LastDeclineType, LoadDatetimeUTC
                     ) VALUES (
@@ -1898,7 +1900,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                         src.BillingAddress, src.BillingCity, src.BillingState, src.BillingZip, src.BillingPhone,
                         src.BillingEmail, src.PaymentMethod, src.GatewayName, src.MerchantID, src.MerchantToken,
                         src.LastFour, src.ExpMonth, src.ExpYear, src.CardType, src.BankName,
-                        src.BankAccountNumber, src.BankRoutingNumber, src.BankAccountType, src.BankType, src.FailedAttempts,
+                        src.BankAccountNumber, src.BankRoutingNumber, src.CheckType, src.BankAccountType, src.FailedAttempts,
                         src.SentFailureDate, src.LastAttemptDate, src.PaymentHoldDate, src.RetryPoints, src.InitialTransactionID,
                         src.LastDeclineType, src.LoadDatetimeUTC
                     )
