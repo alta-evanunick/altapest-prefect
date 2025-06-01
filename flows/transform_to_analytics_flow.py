@@ -1675,13 +1675,22 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 "FACT_DOOR": """
                     CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_DOOR (
                         DoorID INTEGER PRIMARY KEY,
-                        CustomerID INTEGER,
                         OfficeID INTEGER,
-                        AppointmentID INTEGER,
-                        CreatedByEmployeeID INTEGER,
-                        Status STRING,
-                        Type STRING,
+                        Latitude FLOAT,
+                        Longitude FLOAT,
                         DateCreated TIMESTAMP_NTZ,
+                        EmployeeID INTEGER,
+                        Name STRING,
+                        Address STRING,
+                        City STRING,
+                        State STRING,
+                        Zip STRING,
+                        Phone STRING,
+                        Status STRING,
+                        Notes STRING,
+                        Email STRING,
+                        CallbackTime STRING,
+                        KnockCounter INTEGER,
                         LoadDatetimeUTC TIMESTAMP_NTZ
                     )
                 """,
