@@ -1493,6 +1493,229 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 cursor.execute(merge_sql)
                 logger.info(f"Completed {table_name} transformation")
             
+            # Create missing tables first
+            missing_table_creates = {
+                "FACT_APPOINTMENTREMINDER": """
+                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_APPOINTMENTREMINDER (
+                        ReminderID INTEGER PRIMARY KEY,
+                        OfficeID INTEGER,
+                        AppointmentID INTEGER,
+                        ReminderText STRING,
+                        ReminderDate TIMESTAMP_NTZ,
+                        EmailDate TIMESTAMP_NTZ,
+                        VoiceDate TIMESTAMP_NTZ,
+                        Status STRING,
+                        ResponseText STRING,
+                        ResponseDate TIMESTAMP_NTZ,
+                        SentToSMS STRING,
+                        SentToEmail STRING,
+                        SentToPhone STRING,
+                        DateUpdated TIMESTAMP_NTZ,
+                        LoadDatetimeUTC TIMESTAMP_NTZ
+                    )
+                """,
+                
+                "FACT_PAYMENTPROFILE": """
+                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_PAYMENTPROFILE (
+                        PaymentProfileID INTEGER PRIMARY KEY,
+                        CustomerID INTEGER,
+                        OfficeID INTEGER,
+                        CreatedByEmployeeID INTEGER,
+                        PaymentDescription STRING,
+                        DateCreated TIMESTAMP_NTZ,
+                        DateUpdated TIMESTAMP_NTZ,
+                        Status STRING,
+                        StatusNotes STRING,
+                        BillingName STRING,
+                        BillingAddress STRING,
+                        BillingCity STRING,
+                        BillingState STRING,
+                        BillingZip STRING,
+                        BillingPhone STRING,
+                        BillingEmail STRING,
+                        PaymentMethod STRING,
+                        GatewayName STRING,
+                        MerchantID STRING,
+                        MerchantToken STRING,
+                        LastFour STRING,
+                        ExpMonth INTEGER,
+                        ExpYear INTEGER,
+                        CardType STRING,
+                        BankName STRING,
+                        BankAccountNumber STRING,
+                        BankRoutingNumber STRING,
+                        AccountType STRING,
+                        LoadDatetimeUTC TIMESTAMP_NTZ
+                    )
+                """,
+                
+                "FACT_ROUTE": """
+                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_ROUTE (
+                        RouteID INTEGER PRIMARY KEY,
+                        OfficeID INTEGER,
+                        RouteName STRING,
+                        RouteCode STRING,
+                        RouteDate DATE,
+                        AssignedTechID INTEGER,
+                        DateCreated TIMESTAMP_NTZ,
+                        DateUpdated TIMESTAMP_NTZ,
+                        LoadDatetimeUTC TIMESTAMP_NTZ
+                    )
+                """,
+                
+                "FACT_KNOCK": """
+                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_KNOCK (
+                        KnockID INTEGER PRIMARY KEY,
+                        OfficeID INTEGER,
+                        CustomerID INTEGER,
+                        EmployeeID INTEGER,
+                        LeadID INTEGER,
+                        Result STRING,
+                        Outcome STRING,
+                        DateCreated TIMESTAMP_NTZ,
+                        LoadDatetimeUTC TIMESTAMP_NTZ
+                    )
+                """,
+                
+                "FACT_GENERICFLAGASSIGNMENT": """
+                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_GENERICFLAGASSIGNMENT (
+                        GenericFlagAssignmentID INTEGER PRIMARY KEY,
+                        OfficeID INTEGER,
+                        GenericFlagID INTEGER,
+                        RelatedTableRecordID INTEGER,
+                        TableName STRING,
+                        AssignedByEmployeeID INTEGER,
+                        DateAssigned TIMESTAMP_NTZ,
+                        LoadDatetimeUTC TIMESTAMP_NTZ
+                    )
+                """,
+                
+                "FACT_DISBURSEMENTITEM": """
+                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_DISBURSEMENTITEM (
+                        DisbursementItemID INTEGER PRIMARY KEY,
+                        DisbursementID INTEGER,
+                        TicketItemID INTEGER,
+                        Amount FLOAT,
+                        LoadDatetimeUTC TIMESTAMP_NTZ
+                    )
+                """,
+                
+                "FACT_ADDITIONALCONTACTS": """
+                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_ADDITIONALCONTACTS (
+                        AdditionalContactID INTEGER PRIMARY KEY,
+                        CustomerID INTEGER,
+                        Name STRING,
+                        Phone STRING,
+                        Relationship STRING,
+                        IsActive BOOLEAN,
+                        LoadDatetimeUTC TIMESTAMP_NTZ
+                    )
+                """,
+                
+                "FACT_CHARGEBACK": """
+                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_CHARGEBACK (
+                        ChargebackID INTEGER PRIMARY KEY,
+                        TransactionID INTEGER,
+                        OfficeID INTEGER,
+                        CustomerID INTEGER,
+                        TransactionType STRING,
+                        ResponseDescription STRING,
+                        Status STRING,
+                        DateCreated TIMESTAMP_NTZ,
+                        DateUpdated TIMESTAMP_NTZ,
+                        Amount FLOAT,
+                        LoadDatetimeUTC TIMESTAMP_NTZ
+                    )
+                """,
+                
+                "FACT_DISBURSEMENT": """
+                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_DISBURSEMENT (
+                        DisbursementID INTEGER PRIMARY KEY,
+                        OfficeID INTEGER,
+                        EmployeeID INTEGER,
+                        TechnicianID INTEGER,
+                        Status STRING,
+                        PayPeriodStart DATE,
+                        PayPeriodEnd DATE,
+                        DateCreated TIMESTAMP_NTZ,
+                        DatePaid TIMESTAMP_NTZ,
+                        TotalAmount FLOAT,
+                        LoadDatetimeUTC TIMESTAMP_NTZ
+                    )
+                """,
+                
+                "FACT_DOOR": """
+                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_DOOR (
+                        DoorID INTEGER PRIMARY KEY,
+                        CustomerID INTEGER,
+                        OfficeID INTEGER,
+                        AppointmentID INTEGER,
+                        CreatedByEmployeeID INTEGER,
+                        Status STRING,
+                        Type STRING,
+                        DateCreated TIMESTAMP_NTZ,
+                        LoadDatetimeUTC TIMESTAMP_NTZ
+                    )
+                """,
+                
+                "FACT_TICKETITEM": """
+                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_TICKETITEM (
+                        TicketID INTEGER PRIMARY KEY,
+                        CustomerID INTEGER,
+                        BillToAccountID INTEGER,
+                        OfficeID INTEGER,
+                        DateCreated TIMESTAMP_NTZ,
+                        TicketDate DATE,
+                        DateUpdated TIMESTAMP_NTZ,
+                        IsActive BOOLEAN,
+                        Subtotal FLOAT,
+                        TaxAmount FLOAT,
+                        Total FLOAT,
+                        ServiceCharge FLOAT,
+                        ServiceTaxable BOOLEAN,
+                        ProductionValue FLOAT,
+                        TaxRate FLOAT,
+                        AppointmentID INTEGER,
+                        RemainingBalance FLOAT,
+                        SubscriptionID INTEGER,
+                        ServiceID INTEGER,
+                        ItemArray VARIANT,
+                        GLNumber STRING,
+                        CreatedByEmployeeID INTEGER,
+                        LoadDatetimeUTC TIMESTAMP_NTZ
+                    )
+                """,
+                
+                "FACT_TASK": """
+                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_TASK (
+                        TaskID INTEGER PRIMARY KEY,
+                        OfficeID INTEGER,
+                        CustomerID INTEGER,
+                        AddedByEmployeeID INTEGER,
+                        AssignedToEmployeeID INTEGER,
+                        CompletedByEmployeeID INTEGER,
+                        Type STRING,
+                        DueDate TIMESTAMP_NTZ,
+                        DateAdded TIMESTAMP_NTZ,
+                        DateCompleted TIMESTAMP_NTZ,
+                        CategoryID INTEGER,
+                        CategoryDescription STRING,
+                        Description STRING,
+                        CompletionNotes STRING,
+                        ReferenceID INTEGER,
+                        Phone STRING,
+                        DateUpdated TIMESTAMP_NTZ,
+                        Status STRING,
+                        LoadDatetimeUTC TIMESTAMP_NTZ
+                    )
+                """
+            }
+            
+            # Create missing tables
+            for table_name, create_sql in missing_table_creates.items():
+                cursor.execute(create_sql)
+                logger.info(f"Ensured {table_name} exists")
+            
             # Transform the new missing tables
             missing_table_transformations = {
                 "FACT_APPOINTMENTREMINDER": f"""
