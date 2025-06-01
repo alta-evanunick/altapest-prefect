@@ -1545,7 +1545,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                         BankName STRING,
                         BankAccountNumber STRING,
                         BankRoutingNumber STRING,
-                        AccountType STRING,
+                        BankAccountType STRING,
                         LoadDatetimeUTC TIMESTAMP_NTZ
                     )
                 """,
