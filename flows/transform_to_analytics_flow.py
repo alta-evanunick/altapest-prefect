@@ -1300,6 +1300,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
             CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_KNOCK (
                 KnockID INTEGER PRIMARY KEY,
                 KnockType STRING,
+                OfficeID INTEGER,
                 DoorID INTEGER,
                 ServiceID INTEGER,
                 EmployeeID INTEGER,
@@ -1496,7 +1497,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
             # Create missing tables first
             missing_table_creates = {
                 "FACT_APPOINTMENTREMINDER": """
-                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_APPOINTMENTREMINDER (
+                    CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_APPOINTMENTREMINDER (
                         ReminderID INTEGER PRIMARY KEY,
                         OfficeID INTEGER,
                         AppointmentID INTEGER,
@@ -1516,7 +1517,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 """,
                 
                 "FACT_PAYMENTPROFILE": """
-                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_PAYMENTPROFILE (
+                    CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_PAYMENTPROFILE (
                         PaymentProfileID INTEGER PRIMARY KEY,
                         CustomerID INTEGER,
                         OfficeID INTEGER,
@@ -1550,7 +1551,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 """,
                 
                 "FACT_ROUTE": """
-                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_ROUTE (
+                    CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_ROUTE (
                         RouteID INTEGER PRIMARY KEY,
                         RouteTitle STRING,
                         RouteTemplateID INTEGER,
@@ -1583,7 +1584,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 """,
                 
                 "FACT_KNOCK": """
-                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_KNOCK (
+                    CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_KNOCK (
                         KnockID INTEGER PRIMARY KEY,
                         OfficeID INTEGER,
                         CustomerID INTEGER,
@@ -1597,7 +1598,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 """,
                 
                 "FACT_GENERICFLAGASSIGNMENT": """
-                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_GENERICFLAGASSIGNMENT (
+                    CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_GENERICFLAGASSIGNMENT (
                         GenericFlagAssignmentID INTEGER PRIMARY KEY,
                         OfficeID INTEGER,
                         GenericFlagID INTEGER,
@@ -1610,7 +1611,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 """,
                 
                 "FACT_DISBURSEMENTITEM": """
-                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_DISBURSEMENTITEM (
+                    CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_DISBURSEMENTITEM (
                         DisbursementItemID INTEGER PRIMARY KEY,
                         DisbursementID INTEGER,
                         TicketItemID INTEGER,
@@ -1620,7 +1621,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 """,
                 
                 "FACT_ADDITIONALCONTACTS": """
-                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_ADDITIONALCONTACTS (
+                    CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_ADDITIONALCONTACTS (
                         AdditionalContactID INTEGER PRIMARY KEY,
                         CustomerID INTEGER,
                         Name STRING,
@@ -1632,7 +1633,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 """,
                 
                 "FACT_CHARGEBACK": """
-                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_CHARGEBACK (
+                    CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_CHARGEBACK (
                         ChargebackID INTEGER PRIMARY KEY,
                         TransactionID INTEGER,
                         OfficeID INTEGER,
@@ -1648,7 +1649,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 """,
                 
                 "FACT_DISBURSEMENT": """
-                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_DISBURSEMENT (
+                    CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_DISBURSEMENT (
                         DisbursementID INTEGER PRIMARY KEY,
                         OfficeID INTEGER,
                         EmployeeID INTEGER,
@@ -1664,7 +1665,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 """,
                 
                 "FACT_DOOR": """
-                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_DOOR (
+                    CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_DOOR (
                         DoorID INTEGER PRIMARY KEY,
                         CustomerID INTEGER,
                         OfficeID INTEGER,
@@ -1678,7 +1679,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 """,
                 
                 "FACT_TICKETITEM": """
-                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_TICKETITEM (
+                    CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_TICKETITEM (
                         TicketID INTEGER PRIMARY KEY,
                         CustomerID INTEGER,
                         BillToAccountID INTEGER,
@@ -1706,7 +1707,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 """,
                 
                 "FACT_TASK": """
-                    CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_TASK (
+                    CREATE OR REPLACE TABLE STAGING_DB.FIELDROUTES.FACT_TASK (
                         TaskID INTEGER PRIMARY KEY,
                         OfficeID INTEGER,
                         CustomerID INTEGER,
