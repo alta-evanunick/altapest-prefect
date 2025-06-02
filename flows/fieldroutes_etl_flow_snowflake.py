@@ -132,7 +132,7 @@ def fetch_entity(
     logger.info(f"Starting fetch for {entity} - Office {office['office_id']} ({office['office_name']})")
     
     # Special handling for cancellationReason and reserviceReason
-    if endpoint in ["cancellationReason", "reserviceReason"]:
+    if entity in ["cancellationReason", "reserviceReason"]:
         # These entities always use office_id=1 credentials
         # Get office_id=1 credentials
         sf_connector = SnowflakeConnector.load("snowflake-altapestdb")
