@@ -516,7 +516,8 @@ def transform_fact_tables(incremental: bool = True) -> None:
                     LoadDatetimeUTC,
                     ROW_NUMBER() OVER (PARTITION BY RawData:customerID::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                 FROM RAW_DB.FIELDROUTES.SUBSCRIPTION_FACT
-                {where_clause}
+                WHERE RawData:paymentprofileid IS NOT NULL
+                {f"AND LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())" if incremental else ""}
             ) src
             ON tgt.SubscriptionID = src.SubscriptionID
             WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
