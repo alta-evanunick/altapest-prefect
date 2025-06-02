@@ -30,8 +30,8 @@ from prefect_snowflake import SnowflakeConnector
 ENTITY_META = [
     # Dimension tables (reference data)
     ("region",         "REGION_DIM",          True,   True, None, None, {}),
-    ("serviceType",    "SERVICETYPE_DIM",     True,   True, None, None, {}),  # Not in CSV, keeping legacy
-    ("customerSource", "CUSTOMERSOURCE_DIM",  True,   True, None, None, {}),  # Not in CSV, keeping legacy
+    ("serviceType",    "SERVICETYPE_DIM",     True,   True, None, None, {}),
+    ("customerSource", "CUSTOMERSOURCE_DIM",  True,   True, None, None, {}), 
     ("genericFlag",    "GENERICFLAG_DIM",     True,   True, None, None, {}),
     ("cancellationReason", "CANCELLATIONREASON_DIM", True, True, None, None, {}),
     ("product",        "PRODUCT_DIM",         True,   True, None, None, {}),
@@ -968,6 +968,7 @@ def run_fieldroutes_etl(
         logger.info(f"🏢 Processing office {office['office_id']} ({office['office_name']})")
         
         # Process regular entities for each office
+        for meta in regular_entities:
             future = fetch_entity.submit(
                 office=office,
                 meta=meta,
@@ -980,6 +981,7 @@ def run_fieldroutes_etl(
         first_office = offices[0]
         
         # Process global entities only once (on first office)
+        for meta in global_entities:
             future = fetch_entity.submit(
                 office=first_office,
                 meta=meta,
