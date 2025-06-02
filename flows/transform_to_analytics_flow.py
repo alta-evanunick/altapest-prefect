@@ -459,8 +459,8 @@ def transform_fact_tables(incremental: bool = True) -> None:
                     RawData:initialstatus::BOOLEAN as initialStatus,
                     CASE WHEN RawData:datecancelled::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:datecancelled IS NULL 
                          THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:datecancelled::STRING) END as DateCancelled,
-                    CASE WHEN RawData:dateCancelled::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateCancelled IS NULL 
-                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateCancelled::STRING) END as DateCancelled,
+                    CASE WHEN RawData:dateUpdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateUpdated IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateUpdated::STRING) END as DateUpdated,
                     RawData:nextappointmentdue::STRING as nextAppointmentDue,
                     RawData:cxlnotes::STRING as cxlNotes,
                     RawData:cancelledby::INTEGER as cancelledByEmployeeID,
