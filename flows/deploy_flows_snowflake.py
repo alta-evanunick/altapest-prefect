@@ -20,14 +20,39 @@ CDC_ENTITIES = [
 @flow(name="FieldRoutes_Nightly_ETL_Snowflake")
 def run_nightly_fieldroutes_etl(
     test_office_id: Optional[int] = None,
-    test_entity: Optional[str] = None
+    test_entity: Optional[str] = None,
+    test_start_date: Optional[str] = None,
+    test_end_date: Optional[str] = None
 ):
     """Prefect flow to perform a full nightly extract for all offices and entities.
-    Writes directly to Snowflake, bypassing Azure."""
+    Writes directly to Snowflake, bypassing Azure.
+    
+    Args:
+        test_office_id: Limit to single office for testing
+        test_entity: Limit to single entity for testing
+        test_start_date: Override start date (YYYY-MM-DD format)
+        test_end_date: Override end date (YYYY-MM-DD format)
+    """
     logger = get_run_logger()
     now = datetime.datetime.now(timezone.utc)
-    window_end = now
-    window_start = now - datetime.timedelta(days=1)
+    
+    # Calculate time window
+    if test_start_date and test_end_date:
+        # Use provided test dates
+        try:
+            window_start = datetime.datetime.strptime(test_start_date, "%Y-%m-%d").replace(
+                hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
+            )
+            window_end = datetime.datetime.strptime(test_end_date, "%Y-%m-%d").replace(
+                hour=23, minute=59, second=59, microsecond=999999, tzinfo=timezone.utc
+            )
+            logger.info(f"TEST MODE: Using custom date range: {test_start_date} to {test_end_date}")
+        except ValueError as e:
+            raise ValueError(f"Invalid date format. Use YYYY-MM-DD. Error: {e}")
+    else:
+        # Default: previous day
+        window_end = now
+        window_start = now - datetime.timedelta(days=1)
     
     # Retrieve offices and watermarks
     sf_block = SnowflakeConnector.load("snowflake-altapestdb")
@@ -144,10 +169,18 @@ def run_nightly_fieldroutes_etl(
 
 
 @flow(name="FieldRoutes_CDC_ETL_Snowflake")
-def run_cdc_fieldroutes_etl():
+def run_cdc_fieldroutes_etl(
+    test_start_date: Optional[str] = None,
+    test_end_date: Optional[str] = None
+):
     """CDC flow for high-velocity tables using watermarks.
     Processes offices sequentially to avoid overwhelming the FieldRoutes API.
-    Writes directly to Snowflake, bypassing Azure."""
+    Writes directly to Snowflake, bypassing Azure.
+    
+    Args:
+        test_start_date: Override start date (YYYY-MM-DD format)
+        test_end_date: Override end date (YYYY-MM-DD format)
+    """
     logger = get_run_logger()
     
     # Get offices and their CDC watermarks
@@ -212,20 +245,34 @@ def run_cdc_fieldroutes_etl():
         
         # Process CDC tasks sequentially with proper windows based on watermarks
         for entity_name, meta in meta_dict.items():
-            # Use watermark as start time, with 15-minute overlap for safety
-            last_run = office["watermarks"].get(entity_name)
-            if last_run:
-                window_start = last_run - datetime.timedelta(minutes=15)
+            if test_start_date and test_end_date:
+                # Use provided test dates
+                try:
+                    window_start = datetime.datetime.strptime(test_start_date, "%Y-%m-%d").replace(
+                        hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
+                    )
+                    window_end = datetime.datetime.strptime(test_end_date, "%Y-%m-%d").replace(
+                        hour=23, minute=59, second=59, microsecond=999999, tzinfo=timezone.utc
+                    )
+                    logger.info(f"TEST MODE: Using custom date range for {entity_name}: {test_start_date} to {test_end_date}")
+                except ValueError as e:
+                    raise ValueError(f"Invalid date format. Use YYYY-MM-DD. Error: {e}")
             else:
-                # First run - get last 2 hours
-                window_start = now - datetime.timedelta(hours=2)
+                # Use watermark as start time, with 15-minute overlap for safety
+                last_run = office["watermarks"].get(entity_name)
+                if last_run:
+                    window_start = last_run - datetime.timedelta(minutes=15)
+                else:
+                    # First run - get last 2 hours
+                    window_start = now - datetime.timedelta(hours=2)
+                window_end = now
             
             try:
                 fetched, loaded = fetch_entity(
                     office=office,
                     meta=meta,
                     window_start=window_start,
-                    window_end=now
+                    window_end=window_end
                 )
                 office_success += 1
                 logger.info(
@@ -267,6 +314,22 @@ if __name__ == "__main__":
     """
     Create Prefect deployments for the flows
     Optimized for 5-deployment limit
+    
+    Example test runs with date parameters:
+    
+    # Test nightly ETL with specific dates:
+    run_nightly_fieldroutes_etl(
+        test_office_id=1,
+        test_entity="customer", 
+        test_start_date="2024-01-01",
+        test_end_date="2024-01-03"
+    )
+    
+    # Test CDC with date range:
+    run_cdc_fieldroutes_etl(
+        test_start_date="2024-01-01",
+        test_end_date="2024-01-01"
+    )
     """
     from prefect.deployments import Deployment
     from prefect.server.schemas.schedules import CronSchedule
