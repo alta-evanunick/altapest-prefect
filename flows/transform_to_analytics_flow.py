@@ -423,6 +423,218 @@ def transform_fact_tables(incremental: bool = True) -> None:
                 src.LoadDatetimeUTC
             )
         """,
+
+        "FACT_SUBSCRIPTION": f"""
+            MERGE INTO STAGING_DB.FIELDROUTES.FACT_SUBSCRIPTION tgt
+            USING (
+                SELECT 
+                    RawData:subscriptionid::INTEGER as subscriptionID,
+                    RawData:customerid::INTEGER as customerID,
+                    RawData:billtoaccountid::INTEGER as billtoAccountID,
+                    RawData:officeid::INTEGER as officeID,
+                    CASE WHEN RawData:dateAdded::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateAdded IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateAdded::STRING) END as DateAdded,
+                    RawData:contractadded::STRING as contractAdded,
+                    RawData:active::BOOLEAN as isActive,
+                    RawData:initialquote::FLOAT as initialQuote,
+                    RawData:initialdiscount::FLOAT as initialDiscount,
+                    RawData:initialservicetotal::FLOAT as initialServiceTotal,
+                    RawData:recurringcharge::FLOAT as recurringCharge,
+                    RawData:contractvalue::FLOAT as contractValue,
+                    RawData:annualrecurringvalue::FLOAT as annualCV,
+                    RawData:billingfrequency::INTEGER as billingFrequency,
+                    RawData:frequency::INTEGER as serviceFrequency,
+                    RawData:followupservice::INTEGER as followupService,
+                    RawData:agreementlength::INTEGER as agreementLength,
+                    RawData:nextservice::STRING as serviceDue,
+                    RawData:lastcompleted::STRING as lastCompleted,
+                    RawData:serviceid::INTEGER as serviceID,
+                    RawData:servicetype::STRING as serviceType,
+                    RawData:soldby::INTEGER as soldByEmployeeID,
+                    RawData:soldby2::INTEGER as soldByEmployeeID_2,
+                    RawData:soldby3::INTEGER as soldByEmployeeID_3,
+                    RawData:preferredtech::INTEGER as preferredTechID,
+                    RawData:addedby::INTEGER as addedByEmployeeID,
+                    RawData:initialappointmentid::INTEGER as initialAppointmentID,
+                    RawData:initialstatus::BOOLEAN as initialStatus,
+                    CASE WHEN RawData:datecancelled::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:datecancelled IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:datecancelled::STRING) END as DateCancelled,
+                    CASE WHEN RawData:dateCancelled::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateCancelled IS NULL 
+                         THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateCancelled::STRING) END as DateCancelled,
+                    RawData:nextappointmentdue::STRING as nextAppointmentDue,
+                    RawData:cxlnotes::STRING as cxlNotes,
+                    RawData:cancelledby::INTEGER as cancelledByEmployeeID,
+                    RawData:ponumber::INTEGER as poNumber,
+                    RawData:appointmentids::STRING as appointmentIDs,
+                    RawData:completedappointmentids::STRING as completedAppointmentIDs,
+                    RawData:addons::STRING as addOns,
+                    RawData:leadid::INTEGER as leadID,
+                    RawData:leaddateadded::STRING as leadDateAdded,
+                    RawData:leadupdated::STRING as leadDateUpdated,
+                    RawData:leadaddedby::INTEGER as leadAddedByEmployeeID,
+                    RawData:leadsourceid::INTEGER as leadSourceID,
+                    RawData:leadsource::STRING as leadSource,
+                    RawData:leadstatus::BOOLEAN as leadStatus,
+                    RawData:leadstageid::INTEGER as leadStageID,
+                    RawData:leadstage::STRING as leadStage,
+                    RawData:leadassignedto::INTEGER as leadAssignedToEmployeeID,
+                    RawData:leaddateassigned::STRING as leadDateAssigned,
+                    RawData:leadvalue::FLOAT as leadValue,
+                    RawData:leaddateclosed::STRING as leadDateClosed,
+                    RawData:leadlostreason::INTEGER as leadLostReasonID,
+                    RawData:leadlostreasontext::INTEGER as leadLostReasonText,
+                    RawData:sourceid::INTEGER as sourceID,
+                    RawData:source::STRING as source,
+                    RawData:subsourceid::INTEGER as subSourceID,
+                    RawData:subsource::STRING as subSource,
+                    RawData:annualrecurringservices::INTEGER as annualRecurringServices,
+                    RawData:unitids::INTEGER as unitIDs,
+                    RawData:regionid::INTEGER as regionID,
+                    RawData:initialinvoice::FLOAT as initialInvoice,
+                    RawData:initialbillingdate::STRING as initialBillingDate,
+                    RawData:renewalfrequency::INTEGER as renewalFrequency,
+                    RawData:renewaldate::STRING as nextRenewalDate,
+                    RawData:customdate::STRING as customApptDate,
+                    RawData:sentriconconnected::BOOLEAN as sentriconConnected,
+                    RawData:sentriconsiteid::INTEGER as sentriconSiteID,
+                    RawData:seasonalstart::STRING as seasonalStart,
+                    RawData:seasonalend::STRING as seasonalEnd,
+                    RawData:nextbillingdate::STRING as nextBillingDate,
+                    RawData:maxmonthlycharge::FLOAT as maxMonthlyCharge,
+                    RawData:expirationdate::STRING as expirationDate,
+                    RawData:lastappointment::STRING as lastApptCompleted,
+                    RawData:duration::INTEGER as duration,
+                    RawData:preferreddays::INTEGER as preferredDays,
+                    RawData:preferredstart::STRING as preferredStart,
+                    RawData:preferredend::STRING as preferredEnd,
+                    RawData:callahead::INTEGER as callAhead,
+                    RawData:autopaypaymentprofileid::INTEGER as autopayPaymentProfileID,
+                    RawData:billingtermsdays::INTEGER as billingTermsDays,
+                    RawData:onhold::BOOLEAN as onHold,
+                    RawData:customscheduleid::INTEGER as customScheduleID,
+                    RawData:capacityestimate::INTEGER as capacityEstimate,
+                    LoadDatetimeUTC,
+                    ROW_NUMBER() OVER (PARTITION BY RawData:customerID::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
+                FROM RAW_DB.FIELDROUTES.SUBSCRIPTION_FACT
+                {where_clause}
+            ) src
+            ON tgt.SubscriptionID = src.SubscriptionID
+            WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
+                subscriptionID = src.subscriptionID,
+                customerID = src.customerID,
+                billtoAccountID = src.billtoAccountID,
+                officeID = src.officeID,
+                dateAdded = src.dateAdded,
+                contractAdded = src.contractAdded,
+                isActive = src.isActive,
+                initialQuote = src.initialQuote,
+                initialDiscount = src.initialDiscount,
+                initialServiceTotal = src.initialServiceTotal,
+                recurringCharge = src.recurringCharge,
+                contractValue = src.contractValue,
+                annualCV = src.annualCV,
+                billingFrequency = src.billingFrequency,
+                serviceFrequency = src.serviceFrequency,
+                followupService = src.followupService,
+                agreementLength = src.agreementLength,
+                serviceDue = src.serviceDue,
+                lastCompleted = src.lastCompleted,
+                serviceID = src.serviceID,
+                serviceType = src.serviceType,
+                soldByEmployeeID = src.soldByEmployeeID,
+                soldByEmployeeID_2 = src.soldByEmployeeID_2,
+                soldByEmployeeID_3 = src.soldByEmployeeID_3,
+                preferredTechID = src.preferredTechID,
+                addedByEmployeeID = src.addedByEmployeeID,
+                initialAppointmentID = src.initialAppointmentID,
+                initialStatus = src.initialStatus,
+                dateCancelled = src.dateCancelled,
+                dateUpdated = src.dateUpdated,
+                nextAppointmentDue = src.nextAppointmentDue,
+                cxlNotes = src.cxlNotes,
+                cancelledByEmployeeID = src.cancelledByEmployeeID,
+                poNumber = src.poNumber,
+                appointmentIDs = src.appointmentIDs,
+                completedAppointmentIDs = src.completedAppointmentIDs,
+                addOns = src.addOns,
+                leadID = src.leadID,
+                leadDateAdded = src.leadDateAdded,
+                leadDateUpdated = src.leadDateUpdated,
+                leadAddedByEmployeeID = src.leadAddedByEmployeeID,
+                leadSourceID = src.leadSourceID,
+                leadSource = src.leadSource,
+                leadStatus = src.leadStatus,
+                leadStageID = src.leadStageID,
+                leadStage = src.leadStage,
+                leadAssignedToEmployeeID = src.leadAssignedToEmployeeID,
+                leadDateAssigned = src.leadDateAssigned,
+                leadValue = src.leadValue,
+                leadDateClosed = src.leadDateClosed,
+                leadLostReasonID = src.leadLostReasonID,
+                leadLostReasonText = src.leadLostReasonText,
+                sourceID = src.sourceID,
+                source = src.source,
+                subSourceID = src.subSourceID,
+                subSource = src.subSource,
+                annualRecurringServices = src.annualRecurringServices,
+                unitIDs = src.unitIDs,
+                regionID = src.regionID,
+                initialInvoice = src.initialInvoice,
+                initialBillingDate = src.initialBillingDate,
+                renewalFrequency = src.renewalFrequency,
+                nextRenewalDate = src.nextRenewalDate,
+                customApptDate = src.customApptDate,
+                sentriconConnected = src.sentriconConnected,
+                sentriconSiteID = src.sentriconSiteID,
+                seasonalStart = src.seasonalStart,
+                seasonalEnd = src.seasonalEnd,
+                nextBillingDate = src.nextBillingDate,
+                maxMonthlyCharge = src.maxMonthlyCharge,
+                expirationDate = src.expirationDate,
+                lastApptCompleted = src.lastApptCompleted,
+                duration = src.duration,
+                preferredDays = src.preferredDays,
+                preferredStart = src.preferredStart,
+                preferredEnd = src.preferredEnd,
+                callAhead = src.callAhead,
+                autopayPaymentProfileID = src.autopayPaymentProfileID,
+                billingTermsDays = src.billingTermsDays,
+                onHold = src.onHold,
+                customScheduleID = src.customScheduleID,
+                capacityEstimate = src.capacityEstimate,
+                LoadDatetimeUTC = src.LoadDatetimeUTC
+            WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
+                subscriptionID, customerID, billtoAccountID, officeID, dateAdded, contractAdded, isActive, 
+                initialQuote, initialDiscount, initialServiceTotal, recurringCharge, contractValue, annualCV, 
+                billingFrequency, serviceFrequency, followupService, agreementLength, serviceDue, lastCompleted, 
+                serviceID, serviceType, soldByEmployeeID, soldByEmployeeID_2, soldByEmployeeID_3, preferredTechID, 
+                addedByEmployeeID, initialAppointmentID, initialStatus, dateCancelled, dateUpdated, nextAppointmentDue, 
+                cxlNotes, cancelledByEmployeeID, poNumber, appointmentIDs, completedAppointmentIDs, addOns, 
+                leadID, leadDateAdded, leadDateUpdated, leadAddedByEmployeeID, leadSourceID, leadSource, leadStatus, 
+                leadStageID, leadStage, leadAssignedToEmployeeID, leadDateAssigned, leadValue, leadDateClosed, 
+                leadLostReasonID, leadLostReasonText, sourceID, source, subSourceID, subSource, annualRecurringServices, 
+                unitIDs, regionID, initialInvoice, initialBillingDate, renewalFrequency, nextRenewalDate, customApptDate, 
+                sentriconConnected, sentriconSiteID, seasonalStart, seasonalEnd, nextBillingDate, maxMonthlyCharge, 
+                expirationDate, lastApptCompleted, duration, preferredDays, preferredStart, preferredEnd, callAhead, 
+                autopayPaymentProfileID, billingTermsDays, onHold, customScheduleID, capacityEstimate,
+                LoadDatetimeUTC
+            ) VALUES (
+                subscriptionID, src.customerID, src.billtoAccountID, src.officeID, src.dateAdded, src.contractAdded, src.isActive, 
+                src.initialQuote, src.initialDiscount, src.initialServiceTotal, src.recurringCharge, src.contractValue, src.annualCV,
+                src.billingFrequency, src.serviceFrequency, src.followupService, src.agreementLength, src.serviceDue, src.lastCompleted,
+                src.serviceID, src.serviceType, src.soldByEmployeeID, src.soldByEmployeeID_2, src.soldByEmployeeID_3, src.preferredTechID,
+                src.addedByEmployeeID, src.initialAppointmentID, src.initialStatus, src.dateCancelled, src.dateUpdated, src.nextAppointmentDue,
+                src.cxlNotes, src.cancelledByEmployeeID, src.poNumber, src.appointmentIDs, src.completedAppointmentIDs, src.addOns,
+                src.leadID, src.leadDateAdded, src.leadDateUpdated, src.leadAddedByEmployeeID, src.leadSourceID, src.leadSource, src.leadStatus,
+                src.leadStageID, src.leadStage, src.leadAssignedToEmployeeID, src.leadDateAssigned, src.leadValue, src.leadDateClosed,
+                src.leadLostReasonID, src.leadLostReasonText, src.sourceID, src.source, src.subSourceID, src.subSource, src.annualRecurringServices,
+                src.unitIDs, src.regionID, src.initialInvoice, src.initialBillingDate, src.renewalFrequency, src.nextRenewalDate, src.customApptDate,
+                src.sentriconConnected, src.sentriconSiteID, src.seasonalStart, src.seasonalEnd, src.nextBillingDate, src.maxMonthlyCharge,
+                src.expirationDate, src.lastApptCompleted, src.duration, src.preferredDays, src.preferredStart, src.preferredEnd, src.callAhead,
+                src.autopayPaymentProfileID, src.billingTermsDays, src.onHold, src.customScheduleID, src.capacityEstimate,
+                src.LoadDatetimeUTC
+            )
+        """,
         
         "FACT_EMPLOYEE": f"""
             MERGE INTO STAGING_DB.FIELDROUTES.FACT_EMPLOYEE tgt
@@ -815,6 +1027,94 @@ def transform_fact_tables(incremental: bool = True) -> None:
                 SalesmanAPay STRING,
                 TermiteMonitoring INTEGER,
                 PendingCancel INTEGER,
+                LoadDatetimeUTC TIMESTAMP_NTZ
+            )
+        """,
+
+        "FACT_SUBSCRIPTION": """
+            CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_SUBSCRIPTION (
+                subscriptionID INTEGER PRIMARY KEY,
+                customerID INTEGER,
+                billtoAccountID INTEGER,
+                officeID INTEGER,
+                dateAdded STRING,
+                contractAdded STRING,
+                isActive BOOLEAN,
+                initialQuote FLOAT,
+                initialDiscount FLOAT,
+                initialServiceTotal FLOAT,
+                recurringCharge FLOAT,
+                contractValue FLOAT,
+                annualCV FLOAT,
+                billingFrequency INTEGER,
+                serviceFrequency INTEGER,
+                followupService INTEGER,
+                agreementLength INTEGER,
+                serviceDue STRING,
+                lastCompleted STRING,
+                serviceID INTEGER,
+                serviceType STRING,
+                soldByEmployeeID INTEGER,
+                soldByEmployeeID_2 INTEGER,
+                soldByEmployeeID_3 INTEGER,
+                preferredTechID INTEGER,
+                addedByEmployeeID INTEGER,
+                initialAppointmentID INTEGER,
+                initialStatus BOOLEAN,
+                dateCancelled STRING,
+                dateUpdated STRING,
+                nextAppointmentDue STRING,
+                cxlNotes STRING,
+                cancelledByEmployeeID INTEGER,
+                poNumber INTEGER,
+                appointmentIDs STRING,
+                completedAppointmentIDs STRING,
+                addOns STRING,
+                leadID INTEGER,
+                leadDateAdded STRING,
+                leadDateUpdated STRING,
+                leadAddedByEmployeeID INTEGER,
+                leadSourceID INTEGER,
+                leadSource STRING,
+                leadStatus BOOLEAN,
+                leadStageID INTEGER,
+                leadStage STRING,
+                leadAssignedToEmployeeID INTEGER,
+                leadDateAssigned STRING,
+                leadValue FLOAT,
+                leadDateClosed STRING,
+                leadLostReasonID INTEGER,
+                leadLostReasonText INTEGER,
+                sourceID INTEGER,
+                source STRING,
+                subSourceID INTEGER,
+                subSource STRING,
+                annualRecurringServices INTEGER,
+                unitIDs INTEGER,
+                regionID INTEGER,
+                initialInvoice FLOAT,
+                initialBillingDate STRING,
+                renewalFrequency INTEGER,
+                nextRenewalDate STRING,
+                customApptDate STRING,
+                sentriconConnected BOOLEAN,
+                sentriconSiteID INTEGER,
+                seasonalStart STRING,
+                seasonalEnd STRING,
+                nextBillingDate STRING,
+                maxMonthlyCharge FLOAT,
+                expirationDate STRING,
+                lastApptCompleted STRING,
+                duration INTEGER,
+                preferredDays INTEGER,
+                preferredStart STRING,
+                preferredEnd STRING,
+                callAhead INTEGER,
+                autopayPaymentProfileID INTEGER,
+                billingTermsDays INTEGER,
+                onHold BOOLEAN,
+                customScheduleID INTEGER,
+                capacityEstimate INTEGER,
                 LoadDatetimeUTC TIMESTAMP_NTZ
             )
         """,
@@ -1395,7 +1695,7 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
         
         "FACT_DISBURSEMENT": """
             CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_DISBURSEMENT (
-                GatewayDisbursementIDs VARIANT,
+                GatewayDisbursementID INTEGER PRIMARY KEY,
                 DateCreated TIMESTAMP_NTZ,
                 DateUpdated TIMESTAMP_NTZ,
                 Amount FLOAT,
@@ -1618,10 +1918,20 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 
                 "FACT_DISBURSEMENTITEM": """
                     CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_DISBURSEMENTITEM (
-                        DisbursementItemID INTEGER PRIMARY KEY,
-                        DisbursementID INTEGER,
-                        TicketItemID INTEGER,
+                        GatewayDisbursementEntryID INTEGER PRIMARY KEY,
+                        GatewayDisbursementID INTEGER,
+                        DateCreated TIMESTAMP_NTZ,
+                        DateUpdated TIMESTAMP_NTZ,
+                        BillingFirstName STRING,
+                        BillingLastName STRING,
                         Amount FLOAT,
+                        ActualAmount FLOAT,
+                        Description STRING,
+                        IsFee INTEGER,
+                        GatewayEventID STRING,
+                        GatewayEventType STRING,
+                        GatewayEventFeeType STRING,
+                        GatewayEventDescription STRING,
                         LoadDatetimeUTC TIMESTAMP_NTZ
                     )
                 """,
@@ -1656,16 +1966,10 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                 
                 "FACT_DISBURSEMENT": """
                     CREATE TABLE IF NOT EXISTS STAGING_DB.FIELDROUTES.FACT_DISBURSEMENT (
-                        DisbursementID INTEGER PRIMARY KEY,
-                        OfficeID INTEGER,
-                        EmployeeID INTEGER,
-                        TechnicianID INTEGER,
-                        Status STRING,
-                        PayPeriodStart DATE,
-                        PayPeriodEnd DATE,
+                        GatewayDisbursementID INTEGER PRIMARY KEY,
                         DateCreated TIMESTAMP_NTZ,
-                        DatePaid TIMESTAMP_NTZ,
-                        TotalAmount FLOAT,
+                        DateUpdated TIMESTAMP_NTZ,
+                        Amount FLOAT,
                         LoadDatetimeUTC TIMESTAMP_NTZ
                     )
                 """,
@@ -2080,25 +2384,37 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                     MERGE INTO STAGING_DB.FIELDROUTES.FACT_DISBURSEMENTITEM tgt
                     USING (
                         SELECT DISTINCT
-                            RawData:disbursementitemid::INTEGER as DisbursementItemID,
-                            RawData:disbursementid::INTEGER as DisbursementID,
-                            RawData:ticketitemid::INTEGER as TicketItemID,
+                            RawData:gatewaydisbursemententryid::INTEGER as GatewayDisbursementEntryID,
+                            RawData:gatewaydisbursementid::INTEGER as GatewayDisbursementID,
+                            CASE WHEN RawData:datecreated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:datecreated IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:datecreated::STRING) END as DateCreated,
+                            CASE WHEN RawData:dateupdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateupdated IS NULL 
+                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateupdated::STRING) END as DateUpdated,
+                            RawData:billingfirstname::STRING as BillingFirstName,
+                            RawData:billinglastname::STRING as BillingLastName,
                             RawData:amount::FLOAT as Amount,
+                            RawData:actualamount::FLOAT as ActualAmount,
+                            RawData:description::STRING as Description,
+                            RawData:isfee::INTEGER as IsFee,
+                            RawData:gatewayeventid::STRING as GatewayEventID,
+                            RawData:gatewayeventtype::STRING as GatewayEventType,
+                            RawData:gatewayeventfeetype::STRING as GatewayEventFeeType,
+                            RawData:gatewayeventdescription::STRING as GatewayEventDescription,
                             LoadDatetimeUTC,
-                            ROW_NUMBER() OVER (PARTITION BY RawData:disbursementitemid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
+                            ROW_NUMBER() OVER (PARTITION BY RawData:gatewaydisbursemententryid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                         FROM RAW_DB.FIELDROUTES.DISBURSEMENTITEM_FACT
-                        WHERE RawData:disbursementitemid IS NOT NULL
+                        WHERE RawData:gatewaydisbursemententryid IS NOT NULL
                         {f"AND LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())" if incremental else ""}
-                    ) src ON tgt.DisbursementItemID = src.DisbursementItemID
+                    ) src ON tgt.GatewayDisbursementEntryID = src.GatewayDisbursementEntryID
                     WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
-                        DisbursementID = src.DisbursementID,
+                        GatewayDisbursementID = src.GatewayDisbursementID,
                         TicketItemID = src.TicketItemID,
                         Amount = src.Amount,
                         LoadDatetimeUTC = src.LoadDatetimeUTC
                     WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
-                        DisbursementItemID, DisbursementID, TicketItemID, Amount, LoadDatetimeUTC
+                        GatewayDisbursementEntryID, GatewayDisbursementID, TicketItemID, Amount, LoadDatetimeUTC
                     ) VALUES (
-                        src.DisbursementItemID, src.DisbursementID, src.TicketItemID, src.Amount, src.LoadDatetimeUTC
+                        src.GatewayDisbursementEntryID, src.GatewayDisbursementID, src.TicketItemID, src.Amount, src.LoadDatetimeUTC
                     )
                 """,
                 
@@ -2182,58 +2498,27 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                     MERGE INTO STAGING_DB.FIELDROUTES.FACT_DISBURSEMENT tgt
                     USING (
                         SELECT DISTINCT
-                            RawData:disbursementid::INTEGER as DisbursementID,
-                            RawData:employeeid::INTEGER as EmployeeID,
-                            RawData:officeid::INTEGER as OfficeID,
-                            RawData:description::STRING as Description,
-                            RawData:paymentmethod::STRING as PaymentMethod,
-                            RawData:status::STRING as Status,
+                            RawData:gatewaydisbursementid::INTEGER as GatewayDisbursementID,
                             CASE WHEN RawData:datecreated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:datecreated IS NULL 
                                  THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:datecreated::STRING) END as DateCreated,
                             CASE WHEN RawData:dateupdated::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:dateupdated IS NULL 
                                  THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:dateupdated::STRING) END as DateUpdated,
-                            CASE WHEN RawData:datecompleted::STRING IN ('0000-00-00 00:00:00', '', '0000-00-00') OR RawData:datecompleted IS NULL 
-                                 THEN NULL ELSE TRY_TO_TIMESTAMP_NTZ(RawData:datecompleted::STRING) END as DateCompleted,
-                            RawData:checknumber::STRING as CheckNumber,
-                            RawData:subtotal::FLOAT as Subtotal,
-                            RawData:tax::FLOAT as Tax,
-                            RawData:grandtotal::FLOAT as GrandTotal,
-                            RawData:statusnotes::STRING as StatusNotes,
-                            RawData:payerid::INTEGER as PayerID,
-                            RawData:payertype::STRING as PayerType,
+                            RawData:amount::FLOAT as Amount,
                             LoadDatetimeUTC,
-                            ROW_NUMBER() OVER (PARTITION BY RawData:disbursementid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
+                            ROW_NUMBER() OVER (PARTITION BY RawData:gatewaydisbursementid::INTEGER ORDER BY LoadDatetimeUTC DESC) as rn
                         FROM RAW_DB.FIELDROUTES.DISBURSEMENT_FACT
-                        WHERE RawData:disbursementid IS NOT NULL
+                        WHERE RawData:gatewaydisbursementid IS NOT NULL
                         {f"AND LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())" if incremental else ""}
-                    ) src ON tgt.DisbursementID = src.DisbursementID
+                    ) src ON tgt.GatewayDisbursementID = src.GatewayDisbursementID
                     WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
-                        EmployeeID = src.EmployeeID,
-                        OfficeID = src.OfficeID,
-                        Description = src.Description,
-                        PaymentMethod = src.PaymentMethod,
-                        Status = src.Status,
                         DateCreated = src.DateCreated,
                         DateUpdated = src.DateUpdated,
-                        DateCompleted = src.DateCompleted,
-                        CheckNumber = src.CheckNumber,
-                        Subtotal = src.Subtotal,
-                        Tax = src.Tax,
-                        GrandTotal = src.GrandTotal,
-                        StatusNotes = src.StatusNotes,
-                        PayerID = src.PayerID,
-                        PayerType = src.PayerType,
+                        Amount = src.Amount,
                         LoadDatetimeUTC = src.LoadDatetimeUTC
                     WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
-                        DisbursementID, EmployeeID, OfficeID, Description, PaymentMethod,
-                        Status, DateCreated, DateUpdated, DateCompleted, CheckNumber,
-                        Subtotal, Tax, GrandTotal, StatusNotes, PayerID,
-                        PayerType, LoadDatetimeUTC
+                        GatewayDisbursementID, DateCreated, DateUpdated, Amount, LoadDatetimeUTC
                     ) VALUES (
-                        src.DisbursementID, src.EmployeeID, src.OfficeID, src.Description, src.PaymentMethod,
-                        src.Status, src.DateCreated, src.DateUpdated, src.DateCompleted, src.CheckNumber,
-                        src.Subtotal, src.Tax, src.GrandTotal, src.StatusNotes, src.PayerID,
-                        src.PayerType, src.LoadDatetimeUTC
+                        src.GatewayDisbursementID, src.DateCreated, src.DateUpdated, src.Amount, src.LoadDatetimeUTC
                     )
                 """,
                 

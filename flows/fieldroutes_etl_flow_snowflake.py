@@ -10,7 +10,7 @@ from datetime import timezone
 from typing import Dict, List, Optional, Tuple
 import requests
 import pytz
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed as cf_as_completed
 try:
     import orjson
     HAS_ORJSON = True
@@ -18,6 +18,8 @@ except ImportError:
     import json
     HAS_ORJSON = False
 from prefect import flow, task, get_run_logger
+from prefect.task_runners import ConcurrentTaskRunner
+from prefect.futures import as_completed
 from prefect.blocks.system import Secret
 from prefect_snowflake import SnowflakeConnector
 
@@ -515,7 +517,7 @@ def fetch_entity(
             chunk_futures.append(future)
         
         # Collect results as they complete
-        for future in as_completed(chunk_futures):
+        for future in cf_as_completed(chunk_futures):
             chunk_records, chunk_size = future.result()
             if chunk_records:
                 all_records.extend(chunk_records)
@@ -559,6 +561,15 @@ def fetch_entity(
             
             # Insert using staging table approach to handle PARSE_JSON errors
             logger.info(f"Inserting {len(data_rows)} records into {table_name} using staging approach")
+            
+            # Create main table if not exists
+            cursor.execute(f"""
+                CREATE TABLE IF NOT EXISTS RAW_DB.FIELDROUTES.{table_name} (
+                    OfficeID INTEGER,
+                    LoadDatetimeUTC TIMESTAMP_NTZ,
+                    RawData VARIANT
+                )
+            """)
             
             # Create staging table if not exists
             staging_table = f"{table_name}_staging"
@@ -817,7 +828,8 @@ def validate_snowflake_schema() -> bool:
 # =============================================================================
 @flow(
     name="FieldRoutes_to_Snowflake_Direct",
-    description="Direct ETL from FieldRoutes API to Snowflake (bypassing Azure)"
+    description="Direct ETL from FieldRoutes API to Snowflake (bypassing Azure)",
+    task_runner=ConcurrentTaskRunner(max_workers=20)
 )
 def run_fieldroutes_etl(
     office_filter: Optional[List[int]] = None,
@@ -944,53 +956,48 @@ def run_fieldroutes_etl(
     global_entities = [e for e in entities_to_process if e['endpoint'] in global_entity_names]
     regular_entities = [e for e in entities_to_process if e['endpoint'] not in global_entity_names]
     
-    # Process each office/entity combination
+    # Process each office/entity combination concurrently
     total_fetched = 0
     total_loaded = 0
     failed_count = 0
-    processed_global_entities = set()
+
+    future_map = {}
+
     
     for office in offices:
         logger.info(f"🏢 Processing office {office['office_id']} ({office['office_name']})")
         
         # Process regular entities for each office
-        for meta in regular_entities:
-            try:
-                fetched, loaded = fetch_entity(
-                    office=office,
-                    meta=meta,
-                    window_start=window_start,
-                    window_end=window_end
-                )
-                total_fetched += fetched
-                total_loaded += loaded
-                
-                logger.info(f"✅ {meta['endpoint']} completed: {fetched} fetched, {loaded} loaded")
-                
-            except Exception as e:
-                logger.error(f"{meta['endpoint']} failed for office {office['office_id']}: {str(e)}")
-                failed_count += 1
+            future = fetch_entity.submit(
+                office=office,
+                meta=meta,
+                window_start=window_start,
+                window_end=window_end,
+            )
+            future_map[future] = (office['office_id'], meta['endpoint'])
+
+    if offices:
+        first_office = offices[0]
         
         # Process global entities only once (on first office)
-        for meta in global_entities:
-            if meta['endpoint'] not in processed_global_entities:
-                try:
-                    logger.info(f"🌐 Processing global entity {meta['endpoint']} (using office 1 credentials)")
-                    fetched, loaded = fetch_entity(
-                        office=office,  # Will be overridden in fetch_entity
-                        meta=meta,
-                        window_start=window_start,
-                        window_end=window_end
-                    )
-                    total_fetched += fetched
-                    total_loaded += loaded
-                    processed_global_entities.add(meta['endpoint'])
-                    
-                    logger.info(f"✅ {meta['endpoint']} completed: {fetched} fetched, {loaded} loaded")
-                    
-                except Exception as e:
-                    logger.error(f"{meta['endpoint']} failed: {str(e)}")
-                    failed_count += 1
+            future = fetch_entity.submit(
+                office=first_office,
+                meta=meta,
+                window_start=window_start,
+                window_end=window_end,
+            )
+            future_map[future] = (first_office['office_id'], meta['endpoint'])
+
+    for future in as_completed(list(future_map.keys())):
+        office_id, endpoint = future_map[future]
+        try:
+            fetched, loaded = future.result()
+            total_fetched += fetched
+            total_loaded += loaded
+            logger.info(f"✅ {endpoint} completed for office {office_id}: {fetched} fetched, {loaded} loaded")
+        except Exception as e:
+            logger.error(f"{endpoint} failed for office {office_id}: {str(e)}")
+            failed_count += 1
     
     # Process customer cancellation reasons aggregation if customer entity was processed
     if not entity_filter or "customer" in entity_filter:
