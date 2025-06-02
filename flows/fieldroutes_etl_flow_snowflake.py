@@ -131,17 +131,43 @@ def fetch_entity(
     
     logger.info(f"Starting fetch for {entity} - Office {office['office_id']} ({office['office_name']})")
     
-    # API configuration
-    base_url = office["base_url"]
-    headers = {
-        "AuthenticationKey": office["auth_key"],
-        "AuthenticationToken": office["auth_token"],
-    }
-    
-    # Build query parameters
-    params = {
-        "officeIDs": office["office_id"]
-    }
+    # Special handling for cancellationReason and reserviceReason
+    if endpoint in ["cancellationReason", "reserviceReason"]:
+        # These entities always use office_id=1 credentials
+        # Get office_id=1 credentials
+        sf_connector = SnowflakeConnector.load("snowflake-altapestdb")
+        with sf_connector.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT base_url, secret_block_name_key, secret_block_name_token
+                FROM RAW_DB.REF.offices_lookup
+                WHERE office_id = 1 AND active = TRUE
+            """)
+            office1_data = cursor.fetchone()
+            
+        if not office1_data:
+            raise ValueError("Office ID 1 not found or not active")
+            
+        # Use office 1 credentials
+        base_url = office1_data[0]
+        auth_key_secret = Secret.load(office1_data[1])
+        auth_token_secret = Secret.load(office1_data[2])
+        headers = {
+            "AuthenticationKey": auth_key_secret.get(),
+            "AuthenticationToken": auth_token_secret.get(),
+        }
+        # These entities don't use officeIDs parameter
+        params = {}
+    else:
+        # Regular entities use their office's credentials
+        base_url = office["base_url"]
+        headers = {
+            "AuthenticationKey": office["auth_key"],
+            "AuthenticationToken": office["auth_token"],
+        }
+        params = {
+            "officeIDs": office["office_id"]
+        }
     
     # Add any unique parameters for this entity
     params.update(unique_params)
@@ -774,7 +800,9 @@ def run_fieldroutes_etl(
     office_filter: Optional[List[int]] = None,
     entity_filter: Optional[List[str]] = None,
     is_full_refresh: bool = False,
-    window_hours: int = 24
+    window_hours: int = 24,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None
 ):
     """
     Main ETL flow for FieldRoutes to Snowflake.
@@ -783,20 +811,49 @@ def run_fieldroutes_etl(
         office_filter: List of office IDs to process (None = all active offices)
         entity_filter: List of entity names to process (None = all entities)
         is_full_refresh: If True, load all data; if False, incremental load
-        window_hours: Hours to look back for incremental loads
+        window_hours: Hours to look back for incremental loads (ignored if dates provided)
+        start_date: Start date for data extraction (YYYY-MM-DD format)
+        end_date: End date for data extraction (YYYY-MM-DD format)
     """
     logger = get_run_logger()
     
     # Calculate time window
     now = datetime.datetime.now(datetime.UTC)
+    
     if is_full_refresh:
         window_start = None
         window_end = None
         logger.info("Running FULL REFRESH - no date filtering")
+    elif start_date and end_date:
+        # Use provided dates
+        try:
+            # Parse dates and add time components
+            # Start at beginning of start_date
+            window_start = datetime.datetime.strptime(start_date, "%Y-%m-%d").replace(
+                hour=0, minute=0, second=0, microsecond=0, tzinfo=datetime.UTC
+            )
+            # End at end of end_date (23:59:59)
+            window_end = datetime.datetime.strptime(end_date, "%Y-%m-%d").replace(
+                hour=23, minute=59, second=59, microsecond=999999, tzinfo=datetime.UTC
+            )
+            logger.info(f"Running with custom date range: {start_date} to {end_date}")
+            logger.info(f"Window: {window_start} to {window_end}")
+        except ValueError as e:
+            raise ValueError(f"Invalid date format. Use YYYY-MM-DD. Error: {e}")
     else:
-        window_start = now - datetime.timedelta(hours=window_hours)
-        window_end = now
-        logger.info(f"Running incremental load. Window: {window_start} to {window_end}")
+        # Default behavior - previous day or window_hours
+        if window_hours == 24:
+            # For daily runs, use previous full day
+            yesterday = now - datetime.timedelta(days=1)
+            window_start = yesterday.replace(hour=0, minute=0, second=0, microsecond=0)
+            window_end = yesterday.replace(hour=23, minute=59, second=59, microsecond=999999)
+            logger.info(f"Running for previous day: {window_start.date()}")
+        else:
+            # For other windows, use hours back from now
+            window_start = now - datetime.timedelta(hours=window_hours)
+            window_end = now
+            logger.info(f"Running incremental load for last {window_hours} hours")
+        logger.info(f"Window: {window_start} to {window_end}")
     
     # Validate schema first
     if not validate_snowflake_schema():
@@ -858,15 +915,21 @@ def run_fieldroutes_etl(
     
     logger.info(f"Processing {len(entities_to_process)} entities for {len(offices)} offices")
     
+    # Separate global entities from regular entities
+    global_entities = [e for e in entities_to_process if e['endpoint'] in ['cancellationReason', 'reserviceReason']]
+    regular_entities = [e for e in entities_to_process if e['endpoint'] not in ['cancellationReason', 'reserviceReason']]
+    
     # Process each office/entity combination
     total_fetched = 0
     total_loaded = 0
     failed_count = 0
+    processed_global_entities = set()
     
     for office in offices:
         logger.info(f"🏢 Processing office {office['office_id']} ({office['office_name']})")
         
-        for meta in entities_to_process:
+        # Process regular entities for each office
+        for meta in regular_entities:
             try:
                 fetched, loaded = fetch_entity(
                     office=office,
@@ -882,6 +945,27 @@ def run_fieldroutes_etl(
             except Exception as e:
                 logger.error(f"{meta['endpoint']} failed for office {office['office_id']}: {str(e)}")
                 failed_count += 1
+        
+        # Process global entities only once (on first office)
+        for meta in global_entities:
+            if meta['endpoint'] not in processed_global_entities:
+                try:
+                    logger.info(f"🌐 Processing global entity {meta['endpoint']} (using office 1 credentials)")
+                    fetched, loaded = fetch_entity(
+                        office=office,  # Will be overridden in fetch_entity
+                        meta=meta,
+                        window_start=window_start,
+                        window_end=window_end
+                    )
+                    total_fetched += fetched
+                    total_loaded += loaded
+                    processed_global_entities.add(meta['endpoint'])
+                    
+                    logger.info(f"✅ {meta['endpoint']} completed: {fetched} fetched, {loaded} loaded")
+                    
+                except Exception as e:
+                    logger.error(f"{meta['endpoint']} failed: {str(e)}")
+                    failed_count += 1
     
     # Process customer cancellation reasons aggregation if customer entity was processed
     if not entity_filter or "customer" in entity_filter:

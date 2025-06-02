@@ -23,18 +23,43 @@ HIGH_VELOCITY_ENTITIES = {
     name="FieldRoutes_CDC_Flow_Snowflake",
     description="CDC flow for incremental updates directly to Snowflake"
 )
-def run_cdc_fieldroutes_etl():
+def run_cdc_fieldroutes_etl(
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    window_hours: float = 2.25
+):
     """
     CDC flow for incremental updates every 2 hours during business hours.
     Only processes high-velocity entities that change frequently.
     Writes directly to Snowflake, bypassing Azure.
+    
+    Args:
+        start_date: Start date for data extraction (YYYY-MM-DD format)
+        end_date: End date for data extraction (YYYY-MM-DD format) 
+        window_hours: Hours to look back (default 2.25 for 2h15m window)
     """
     logger = get_run_logger()
     
-    # CDC window: last 2 hours with 15-minute overlap for safety
+    # Calculate time window
     now = datetime.datetime.now(timezone.utc)
-    window_start = now - datetime.timedelta(hours=2, minutes=15)
-    window_end = now
+    
+    if start_date and end_date:
+        # Use provided dates
+        try:
+            # Parse dates and add time components
+            window_start = datetime.datetime.strptime(start_date, "%Y-%m-%d").replace(
+                hour=0, minute=0, second=0, microsecond=0, tzinfo=timezone.utc
+            )
+            window_end = datetime.datetime.strptime(end_date, "%Y-%m-%d").replace(
+                hour=23, minute=59, second=59, microsecond=999999, tzinfo=timezone.utc
+            )
+            logger.info(f"Running CDC with custom date range: {start_date} to {end_date}")
+        except ValueError as e:
+            raise ValueError(f"Invalid date format. Use YYYY-MM-DD. Error: {e}")
+    else:
+        # Default CDC window: last 2 hours with 15-minute overlap for safety
+        window_start = now - datetime.timedelta(hours=window_hours)
+        window_end = now
     
     logger.info(f"Starting CDC FieldRoutes ETL (Direct to Snowflake). Window: {window_start} to {window_end}")
     
