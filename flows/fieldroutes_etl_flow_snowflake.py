@@ -10,6 +10,7 @@ from datetime import timezone
 from typing import Dict, List, Optional, Tuple
 import requests
 import pytz
+from concurrent.futures import ThreadPoolExecutor, as_completed
 try:
     import orjson
     HAS_ORJSON = True
@@ -49,7 +50,7 @@ ENTITY_META = [
     ("door",           "DOOR_FACT",      False, False, "timeCreated", None, {}),
     ("disbursement",   "DISBURSEMENT_FACT", False, False, "dateUpdated", "dateCreated", {}),
     ("chargeback",     "CHARGEBACK_FACT", False, False, "dateUpdated", "dateCreated", {}),
-    ("additionalContacts", "ADDITIONALCONTACTS_FACT", False, False, "dateUpdated", "dateCreated", {}),
+    ("additionalContacts", "ADDITIONALCONTACTS_FACT", False, False, None, None, {}),
     ("disbursementItem", "DISBURSEMENTITEM_FACT", False, False, "dateUpdated", "dateCreated", {}),
     ("genericFlagAssignment", "GENERICFLAGASSIGNMENT_FACT", False, False, "dateUpdated", "dateCreated", {}),
     ("knock",          "KNOCK_FACT",          False, False, "dateUpdated", "dateAdded", {}),
@@ -131,8 +132,10 @@ def fetch_entity(
     
     logger.info(f"Starting fetch for {entity} - Office {office['office_id']} ({office['office_name']})")
     
-    # Special handling for cancellationReason and reserviceReason
-    if entity in ["cancellationReason", "reserviceReason"]:
+    # Special handling for global entities (those that don't use officeID parameter)
+    global_entities = ["cancellationReason", "reserviceReason", "disbursementItem", "customerSource"]
+    
+    if entity in global_entities:
         # These entities always use office_id=1 credentials
         # Get office_id=1 credentials
         sf_connector = SnowflakeConnector.load("snowflake-altapestdb")
@@ -369,7 +372,7 @@ def fetch_entity(
                     "ticketItem": "ticketItemID",
                     "payment": "paymentID",
                     "appliedPayment": "appliedPaymentID",
-                    "disbursement": "disbursementID",
+                    "disbursement": "gatewayDisbursementIDs",
                     "chargeback": "chargebackID"
                 }.get(entity, f"{entity}ID")
                 
@@ -429,11 +432,16 @@ def fetch_entity(
     # == Step 2: Fetch actual records using /get endpoint ======================
     all_records = []
     
-    for id_chunk in chunk_list(all_ids, 1000):
-        # Build query string for batch get
+    def fetch_chunk(id_chunk):
+        """Fetch a single chunk of records"""
         id_list = ",".join(str(id) for id in id_chunk)
-        get_url = f"{base_url}/{entity}/get?{entity}IDs=[{id_list}]"
-        logger.info(f"Fetching chunk of {len(id_chunk)} records")
+        
+        # Special parameter name mapping for GET requests
+        get_param_map = {
+            "disbursement": "gatewayDisbursementIDs"
+        }
+        param_name = get_param_map.get(entity, f"{entity}IDs")
+        get_url = f"{base_url}/{entity}/get?{param_name}=[{id_list}]"
         
         try:
             get_data = make_api_request(get_url, headers, timeout=60)
@@ -489,16 +497,31 @@ def fetch_entity(
                 # Sometimes the response is just a list
                 chunk_records = get_data
             
-            if chunk_records:
-                all_records.extend(chunk_records)
-                logger.info(f"Retrieved {len(chunk_records)} records in this chunk")
-            else:
-                logger.warning(f"No records found in get response. Keys: {list(get_data.keys())}")
+            return chunk_records, len(id_chunk)
                 
         except Exception as e:
             logger.error(f"Failed to fetch chunk: {str(e)}")
-            # Continue with other chunks rather than failing entirely
-            continue
+            return [], len(id_chunk)
+    
+    # Process chunks concurrently with up to 20 threads
+    # Use smaller batch size for entities that cause URI length issues
+    batch_size = 500 if entity == "note" else 1000
+    logger.info(f"Using batch size {batch_size} for {entity}")
+    
+    chunk_futures = []
+    with ThreadPoolExecutor(max_workers=20) as executor:
+        for id_chunk in chunk_list(all_ids, batch_size):
+            future = executor.submit(fetch_chunk, id_chunk)
+            chunk_futures.append(future)
+        
+        # Collect results as they complete
+        for future in as_completed(chunk_futures):
+            chunk_records, chunk_size = future.result()
+            if chunk_records:
+                all_records.extend(chunk_records)
+                logger.info(f"Retrieved {len(chunk_records)} records in chunk of {chunk_size}")
+            else:
+                logger.warning(f"No records found in chunk of {chunk_size}")
     
     total_records = len(all_records)
     logger.info(f"Total records fetched for {entity}: {total_records}")
@@ -916,8 +939,10 @@ def run_fieldroutes_etl(
     logger.info(f"Processing {len(entities_to_process)} entities for {len(offices)} offices")
     
     # Separate global entities from regular entities
-    global_entities = [e for e in entities_to_process if e['endpoint'] in ['cancellationReason', 'reserviceReason']]
-    regular_entities = [e for e in entities_to_process if e['endpoint'] not in ['cancellationReason', 'reserviceReason']]
+    # Global entities don't use officeID parameter (though some may still use date filters)
+    global_entity_names = ['cancellationReason', 'reserviceReason', 'disbursementItem', 'customerSource']
+    global_entities = [e for e in entities_to_process if e['endpoint'] in global_entity_names]
+    regular_entities = [e for e in entities_to_process if e['endpoint'] not in global_entity_names]
     
     # Process each office/entity combination
     total_fetched = 0
