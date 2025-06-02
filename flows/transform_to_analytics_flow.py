@@ -2436,9 +2436,15 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
             
             # Execute the missing table transformations
             for table_name, merge_sql in missing_table_transformations.items():
-                logger.info(f"Transforming {table_name}")
-                cursor.execute(merge_sql)
-                logger.info(f"Completed {table_name} transformation")
+                try:
+                    logger.info(f"Transforming {table_name}")
+                    cursor.execute(merge_sql)
+                    logger.info(f"Completed {table_name} transformation")
+                except Exception as e:
+                    if "does not exist" in str(e):
+                        logger.warning(f"Skipping {table_name} - source table does not exist: {e}")
+                    else:
+                        raise
 
 
 @task(name="refresh_reporting_views")
