@@ -2408,14 +2408,20 @@ def transform_additional_fact_tables(incremental: bool = True) -> None:
                         {f"AND LoadDatetimeUTC >= DATEADD(hour, -48, CURRENT_TIMESTAMP())" if incremental else ""}
                     ) src ON tgt.GatewayDisbursementEntryID = src.GatewayDisbursementEntryID
                     WHEN MATCHED AND src.rn = 1 THEN UPDATE SET
-                        GatewayDisbursementID = src.GatewayDisbursementID,
-                        TicketItemID = src.TicketItemID,
-                        Amount = src.Amount,
+                        GatewayDisbursementID = src.GatewayDisbursementID, DateCreated = src.DateCreated, 
+                        DateUpdated = src.DateUpdated, BillingFirstName = src.BillingFirstName, BillingLastName = src.BillingLastName,
+                        Amount = src.Amount, ActualAmount = src.ActualAmount, Description = src.Description,
+                        IsFee = src.IsFee, GatewayEventID = src.GatewayEventID, GatewayEventType = src.GatewayEventType,
+                        GatewayEventFeeType = src.GatewayEventFeeType, GatewayEventDescription = src.GatewayEventDescription,
                         LoadDatetimeUTC = src.LoadDatetimeUTC
                     WHEN NOT MATCHED AND src.rn = 1 THEN INSERT (
-                        GatewayDisbursementEntryID, GatewayDisbursementID, TicketItemID, Amount, LoadDatetimeUTC
+                        GatewayDisbursementEntryID, GatewayDisbursementID, DateCreated, DateUpdated, BillingFirstName,
+                        BillingLastName, Amount, ActualAmount, Description, IsFee, GatewayEventID,
+                        GatewayEventType, GatewayEventFeeType, GatewayEventDescription, LoadDatetimeUTC
                     ) VALUES (
-                        src.GatewayDisbursementEntryID, src.GatewayDisbursementID, src.TicketItemID, src.Amount, src.LoadDatetimeUTC
+                        src.GatewayDisbursementEntryID, src.GatewayDisbursementID, src.DateCreated, src.DateUpdated, src.BillingFirstName,
+                        src.BillingLastName, src.Amount, src.ActualAmount, src.Description, src.IsFee, src.GatewayEventID,
+                        src.GatewayEventType, src.GatewayEventFeeType, src.GatewayEventDescription, src.LoadDatetimeUTC
                     )
                 """,
                 
