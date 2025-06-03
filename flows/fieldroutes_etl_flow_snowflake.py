@@ -108,7 +108,8 @@ def fetch_entity(
     office: Dict, 
     meta: Dict, 
     window_start: Optional[datetime.datetime] = None, 
-    window_end: Optional[datetime.datetime] = None
+    window_end: Optional[datetime.datetime] = None,
+    global_office_creds: Optional[Dict] = None
 ) -> Tuple[int, int]:
     """
     Fetch entity data from FieldRoutes API and load directly to Snowflake.
@@ -139,28 +140,36 @@ def fetch_entity(
     
     if entity in global_entities:
         # These entities always use office_id=1 credentials
-        # Get office_id=1 credentials
-        sf_connector = SnowflakeConnector.load("snowflake-altapestdb")
-        with sf_connector.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                SELECT base_url, secret_block_name_key, secret_block_name_token
-                FROM RAW_DB.REF.offices_lookup
-                WHERE office_id = 1 AND active = TRUE
-            """)
-            office1_data = cursor.fetchone()
-            
-        if not office1_data:
-            raise ValueError("Office ID 1 not found or not active")
-            
-        # Use office 1 credentials
-        base_url = office1_data[0]
-        auth_key_secret = Secret.load(office1_data[1])
-        auth_token_secret = Secret.load(office1_data[2])
-        headers = {
-            "AuthenticationKey": auth_key_secret.get(),
-            "AuthenticationToken": auth_token_secret.get(),
-        }
+        if global_office_creds:
+            # Use pre-loaded credentials if provided
+            base_url = global_office_creds["base_url"]
+            headers = {
+                "AuthenticationKey": global_office_creds["auth_key"],
+                "AuthenticationToken": global_office_creds["auth_token"],
+            }
+        else:
+            # Fallback: load credentials (for backward compatibility)
+            sf_connector = SnowflakeConnector.load("snowflake-altapestdb")
+            with sf_connector.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT base_url, secret_block_name_key, secret_block_name_token
+                    FROM RAW_DB.REF.offices_lookup
+                    WHERE office_id = 1 AND active = TRUE
+                """)
+                office1_data = cursor.fetchone()
+                
+            if not office1_data:
+                raise ValueError("Office ID 1 not found or not active")
+                
+            # Use office 1 credentials
+            base_url = office1_data[0]
+            auth_key_secret = Secret.load(office1_data[1])
+            auth_token_secret = Secret.load(office1_data[2])
+            headers = {
+                "AuthenticationKey": auth_key_secret.get(),
+                "AuthenticationToken": auth_token_secret.get(),
+            }
         # These entities don't use officeIDs parameter
         params = {}
     else:
@@ -322,6 +331,7 @@ def fetch_entity(
                 continue
             else:
                 # Less than 50K means we got all records
+                logger.info(f"Pagination complete: got {len(page_ids)} records on page {page_count} (less than 50K limit)")
                 break
                 
         except Exception as e:
@@ -429,7 +439,7 @@ def fetch_entity(
         logger.warning(f"No IDs found for {entity} in office {office['office_id']}")
         return 0, 0
     
-    logger.info(f"Total unique IDs to fetch: {len(all_ids)}")
+    logger.info(f"📊 Pagination summary for {entity}: {page_count} pages searched, {len(all_ids)} total unique IDs to fetch")
     
     # == Step 2: Fetch actual records using /get endpoint ======================
     all_records = []
@@ -502,31 +512,47 @@ def fetch_entity(
             return chunk_records, len(id_chunk)
                 
         except Exception as e:
-            logger.error(f"Failed to fetch chunk: {str(e)}")
+            logger.error(f"Failed to fetch chunk of {len(id_chunk)} IDs: {str(e)}")
+            logger.error(f"Failed URL was: {get_url[:200]}...")  # Log first 200 chars of URL
             return [], len(id_chunk)
     
     # Process chunks concurrently with up to 20 threads
     # Use smaller batch size for entities that cause URI length issues
-    batch_size = 500 if entity == "note" else 1000
+    if entity == "note":
+        batch_size = 500
+    elif entity == "disbursementItem":
+        batch_size = 250  # Very small batch size due to long IDs
+    else:
+        batch_size = 1000
     logger.info(f"Using batch size {batch_size} for {entity}")
     
     chunk_futures = []
+    total_chunks = len(list(chunk_list(all_ids, batch_size)))
+    logger.info(f"📦 Processing {total_chunks} chunks of {batch_size} IDs each")
+    
     with ThreadPoolExecutor(max_workers=20) as executor:
         for id_chunk in chunk_list(all_ids, batch_size):
             future = executor.submit(fetch_chunk, id_chunk)
             chunk_futures.append(future)
         
         # Collect results as they complete
+        completed_chunks = 0
+        failed_chunks = 0
         for future in cf_as_completed(chunk_futures):
             chunk_records, chunk_size = future.result()
+            completed_chunks += 1
             if chunk_records:
                 all_records.extend(chunk_records)
-                logger.info(f"Retrieved {len(chunk_records)} records in chunk of {chunk_size}")
+                logger.info(f"Chunk {completed_chunks}/{total_chunks}: Retrieved {len(chunk_records)} records")
             else:
-                logger.warning(f"No records found in chunk of {chunk_size}")
+                failed_chunks += 1
+                logger.warning(f"Chunk {completed_chunks}/{total_chunks}: No records found")
+        
+        if failed_chunks > 0:
+            logger.warning(f"⚠️ {failed_chunks} out of {total_chunks} chunks failed to fetch data")
     
     total_records = len(all_records)
-    logger.info(f"Total records fetched for {entity}: {total_records}")
+    logger.info(f"✅ Fetch complete for {entity}: {total_records} records fetched from {len(all_ids)} IDs")
     
     if total_records == 0:
         logger.warning(f"No records retrieved for {entity} despite having {len(all_ids)} IDs")
@@ -956,6 +982,21 @@ def run_fieldroutes_etl(
     global_entities = [e for e in entities_to_process if e['endpoint'] in global_entity_names]
     regular_entities = [e for e in entities_to_process if e['endpoint'] not in global_entity_names]
     
+    # Load office 1 credentials once for global entities
+    global_office_creds = None
+    if global_entities:
+        # Find office 1 in our offices list
+        office1 = next((o for o in offices if o['office_id'] == 1), None)
+        if office1:
+            global_office_creds = {
+                "base_url": office1["base_url"],
+                "auth_key": office1["auth_key"],
+                "auth_token": office1["auth_token"]
+            }
+            logger.info("Loaded office 1 credentials for global entities")
+        else:
+            logger.warning("Office 1 not found in active offices - global entities will load credentials individually")
+    
     # Process each office/entity combination concurrently
     total_fetched = 0
     total_loaded = 0
@@ -987,6 +1028,7 @@ def run_fieldroutes_etl(
                 meta=meta,
                 window_start=window_start,
                 window_end=window_end,
+                global_office_creds=global_office_creds
             )
             future_map[future] = (first_office['office_id'], meta['endpoint'])
 
