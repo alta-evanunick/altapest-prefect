@@ -52,7 +52,7 @@ def run_nightly_fieldroutes_etl(
     else:
         # Default: previous day
         window_end = now
-        window_start = now - datetime.timedelta(days=1)
+        window_start = now - datetime.timedelta(days=2)
     
     # Retrieve offices and watermarks
     sf_block = SnowflakeConnector.load("snowflake-altapestdb")
